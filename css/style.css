@@ -1,0 +1,727 @@
+/* 通用样式 */
+.sold-out {
+    opacity: 0.5;
+}
+
+.sold-out::before {
+    content: '已售';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2rem;
+    color: red;
+    z-index: 1;
+}
+
+.phone-card {
+    position: relative;
+    background: white;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.phone-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* 筛选按钮样式 */
+.filter-btn, .sort-btn {
+    color: #666;
+    background: transparent;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.filter-btn:hover, .sort-btn:hover {
+    color: #3B82F6;
+    background-color: #F3F4F6;
+}
+
+.filter-btn.active {
+    background: #EBF5FF;
+    color: #3B82F6;
+    font-weight: 500;
+}
+
+.sort-btn.active {
+    background: #EBF5FF;
+    color: #3B82F6;
+    font-weight: 500;
+}
+
+.sort-btn.active::after {
+    content: '';
+    display: inline-block;
+    width: 0;
+    height: 0;
+    margin-left: 4px;
+    vertical-align: middle;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+}
+
+.sort-btn.active[data-order="asc"]::after {
+    border-bottom: 4px solid #3B82F6;
+}
+
+.sort-btn.active[data-order="desc"]::after {
+    border-top: 4px solid #3B82F6;
+}
+
+/* 模态框样式 */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 10;
+}
+
+.modal-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    padding: 30px;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+/* 模态框标题样式 */
+#modalTitle {
+    display: inline-block;
+    padding: 1rem 2rem;
+    margin: 0 auto 1.5rem;
+    text-align: center;
+    font-weight: 600;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    background-image: linear-gradient(to right, #3b82f6, #22c55e);  /* 从蓝色到绿色的渐变 */
+}
+
+/* 关闭按钮样式 */
+.close-button {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+    transition: color 0.2s;
+}
+
+.close-button:hover {
+    color: #000;
+}
+
+/* 分页按钮样式 */
+.pagination-btn {
+    transition: all 0.3s ease;
+}
+
+.pagination-btn:hover:not([disabled]) {
+    transform: translateY(-2px);
+}
+
+/* 图片查看器样式 */
+.image-viewer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    z-index: 20;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.image-viewer img {
+    max-width: 90%;
+    max-height: 90%;
+    object-fit: contain;
+}
+
+.image-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    color: white;
+    font-size: 2rem;
+    cursor: pointer;
+    padding: 10px;
+    background-color: rgba(0, 0, 0, 0.5);
+    border-radius: 50%;
+    transition: background-color 0.3s;
+}
+
+.image-nav:hover {
+    background-color: rgba(0, 0, 0, 0.8);
+}
+
+.image-nav.prev {
+    left: 20px;
+}
+
+.image-nav.next {
+    right: 20px;
+}
+
+.image-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    color: white;
+    font-size: 2rem;
+    cursor: pointer;
+}
+
+/* 响应式调整 */
+@media (max-width: 640px) {
+    .filter-btn, .sort-btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* 图片计数器样式 */
+.image-counter {
+    position: absolute;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    color: white;
+    font-size: 0.875rem;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    padding: 8px 16px;
+    border-radius: 20px;
+    width: fit-content;
+    margin: 0 auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hidden {
+    display: none;
+}
+
+/* 预览容器样式 */
+.preview-container {
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    background-color: #f9fafb;
+}
+
+.preview-container img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.25rem;
+    display: block;
+    margin: 0 auto;
+}
+
+.preview-container.hidden {
+    display: none;
+}
+
+/* 图片网格样式 */
+.image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.image-grid img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 8px;
+    transition: transform 0.2s ease;
+}
+
+.image-grid img:hover {
+    transform: scale(1.05);
+}
+
+/* 编辑和删除按钮的基础样式 */
+.edit-btn {
+    position: absolute;
+    right: 60px;
+    background-color: #3b82f6;
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: white;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 2;
+    top: 10px;
+}
+
+.edit-btn:hover {
+    background-color: #2563eb;
+    transform: translateY(-1px);
+}
+
+/* 删除按钮样式 */
+.delete-btn,
+button[onclick="deleteLogo()"],
+button[onclick="deleteFavicon()"] {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+}
+
+.delete-btn:hover,
+button[onclick="deleteLogo()"]:hover,
+button[onclick="deleteFavicon()"]:hover {
+    background-color: #dc2626;
+    transform: scale(1.05);
+    box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3);
+}
+
+.delete-btn:active,
+button[onclick="deleteLogo()"]:active,
+button[onclick="deleteFavicon()"]:active {
+    transform: scale(0.95);
+    box-shadow: 0 1px 2px rgba(239, 68, 68, 0.2);
+}
+
+.delete-btn i,
+button[onclick="deleteLogo()"] i,
+button[onclick="deleteFavicon()"] i {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+/* 确保按钮在卡片hover时仍然可见 */
+.phone-card {
+    position: relative;
+}
+
+.phone-card:hover .edit-btn,
+.phone-card:hover .delete-btn {
+    opacity: 1;
+}
+
+/* 删除旧的导航栏样式 */
+.nav-container {
+    display: none;
+}
+
+.page-title {
+    display: none;
+}
+
+.button-group {
+    display: none;
+}
+
+.btn {
+    display: none;
+}
+
+.btn-primary {
+    display: none;
+}
+
+.btn-warning {
+    display: none;
+}
+
+.btn-danger {
+    display: none;
+}
+
+/* Logo样式 */
+#siteLogo {
+    object-fit: contain;
+    transition: transform 0.2s ease;
+}
+
+#siteLogo:hover {
+    transform: scale(1.05);
+}
+
+/* 标题容器样式 */
+.flex.items-center.justify-center.gap-4 {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+}
+
+/* 修改密码模态框样式 */
+#changePasswordModal .modal-content {
+    max-width: 400px;
+    padding: 2rem;
+}
+
+#changePasswordModal input[type="password"] {
+    width: 100%;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    font-size: 1rem;
+}
+
+#changePasswordModal input[type="password"]:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+#changePasswordModal label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #374151;
+    font-weight: 500;
+}
+
+#changePasswordModal .flex.justify-end button {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+#changePasswordModal .flex.justify-end button[type="submit"] {
+    background-color: #3b82f6;
+    color: white;
+}
+
+#changePasswordModal .flex.justify-end button[type="submit"]:hover {
+    background-color: #2563eb;
+}
+
+#changePasswordModal .flex.justify-end button[type="button"] {
+    background-color: #6b7280;
+    color: white;
+}
+
+#changePasswordModal .flex.justify-end button[type="button"]:hover {
+    background-color: #4b5563;
+}
+
+/* 删除按钮通用样式 */
+button[onclick*="delete"] {
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+}
+
+button[onclick*="delete"]:hover {
+    background-color: #dc2626;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3);
+}
+
+button[onclick*="delete"]:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(239, 68, 68, 0.2);
+}
+
+button[onclick*="delete"]::before {
+    content: '×';
+    font-size: 1.2em;
+    line-height: 1;
+    margin-right: 4px;
+}
+
+/* 文件上传区域样式 */
+.file-upload-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+    .file-upload-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+.file-upload-group {
+    position: relative;
+}
+
+.file-upload-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #374151;
+    font-weight: 500;
+}
+
+.file-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.file-input-wrapper input[type="file"] {
+    flex: 1;
+    height: 42px;
+    padding: 8px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    background-color: white;
+    font-size: 0.875rem;
+}
+
+.file-input-wrapper input[type="file"]:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 移除之前的特定删除按钮样式覆盖 */
+button[onclick="deleteLogo()"],
+button[onclick="deleteFavicon()"] {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+}
+
+button[onclick="deleteLogo()"] i,
+button[onclick="deleteFavicon()"] i {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+button[onclick="deleteLogo()"]:hover,
+button[onclick="deleteFavicon()"]:hover {
+    background-color: #dc2626;
+    transform: scale(1.05);
+    box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3);
+}
+
+button[onclick="deleteLogo()"]:active,
+button[onclick="deleteFavicon()"]:active {
+    transform: scale(0.95);
+    box-shadow: 0 1px 2px rgba(239, 68, 68, 0.2);
+}
+
+/* 文件上传区域样式 */
+input[type="file"] {
+    height: 42px;
+    padding: 8px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    background-color: white;
+    font-size: 0.875rem;
+    width: 100%;
+}
+
+input[type="file"]:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.flex-1 {
+    flex: 1 1 0%;
+}
+
+.flex.items-center.gap-2 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* 表格样式 */
+.table-auto {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table-auto th {
+    background-color: #f9fafb;
+    font-weight: 600;
+    text-align: left;
+    padding: 0.75rem 1rem;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.table-auto td {
+    padding: 0.75rem 1rem;
+    vertical-align: middle;
+}
+
+.table-auto tbody tr {
+    border-bottom: 1px solid #e5e7eb;
+    transition: background-color 0.2s ease;
+}
+
+.table-auto tbody tr:hover {
+    background-color: #f9fafb;
+}
+
+/* 表格中的操作按钮样式 */
+.table-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.table-actions button {
+    padding: 0.5rem;
+    border-radius: 0.375rem;
+    transition: all 0.2s ease;
+}
+
+.table-actions .edit-btn {
+    position: static;
+    background-color: #3b82f6;
+    color: white;
+}
+
+.table-actions .delete-btn {
+    position: static;
+    width: auto;
+    height: auto;
+    border-radius: 0.375rem;
+    padding: 0.5rem;
+}
+
+/* 状态标签样式 */
+.status-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.status-tag.available {
+    background-color: #dcfce7;
+    color: #166534;
+}
+
+.status-tag.sold {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+/* 价格列样式 */
+.price-column {
+    font-weight: 600;
+    color: #ef4444;
+}
+
+/* 维修记录样式 */
+.repair-record {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 表格响应式处理 */
+@media (max-width: 768px) {
+    .overflow-x-auto {
+        margin: 0 -1rem;
+        padding: 0 1rem;
+    }
+    
+    .table-auto th,
+    .table-auto td {
+        padding: 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    .repair-record {
+        max-width: 150px;
+    }
+}
+
+/* 排序按钮样式 */
+.sort-btn {
+    position: relative;
+    background-color: #f3f4f6;
+    color: #374151;
+    transition: all 0.3s ease;
+}
+
+.sort-btn:hover {
+    background-color: #e5e7eb;
+}
+
+.sort-btn.sort-asc::after,
+.sort-btn.sort-desc::after {
+    content: '';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+}
+
+.sort-btn.sort-asc::after {
+    border-bottom: 5px solid #4b5563;
+}
+
+.sort-btn.sort-desc::after {
+    border-top: 5px solid #4b5563;
+}
+
+.sort-btn.sort-asc,
+.sort-btn.sort-desc {
+    padding-right: 24px;
+    background-color: #dbeafe;
+    color: #1e40af;
+}
