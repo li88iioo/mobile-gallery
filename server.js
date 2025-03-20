@@ -100,45 +100,29 @@ async function checkAndFixPermissions() {
         for (const dir of dirs) {
             try {
                 await fs.access(dir);
-                console.log(`目录已存在: ${dir}`);
             } catch {
                 await fs.mkdir(dir, { recursive: true, mode: 0o755 });
-                console.log(`创建目录: ${dir}`);
             }
-            try {
-                await chmod(dir, 0o755);
-                console.log(`设置目录权限成功: ${dir}`);
-            } catch (error) {
-                console.error(`设置目录权限失败: ${dir}`, error);
-            }
+            await chmod(dir, 0o755).catch(error => 
+                console.error(`设置目录权限失败: ${dir}`, error)
+            );
         }
         
         // 检查并创建文件
         for (const file of files) {
             try {
                 await fs.access(file);
-                console.log(`文件已存在: ${file}`);
             } catch {
-                // 先创建目录（如果不存在）
                 const dir = path.dirname(file);
-                try {
-                    await fs.mkdir(dir, { recursive: true, mode: 0o755 });
-                } catch (error) {
-                    console.error(`创建目录失败: ${dir}`, error);
-                }
-                // 创建文件并设置权限
+                await fs.mkdir(dir, { recursive: true, mode: 0o755 }).catch(error => 
+                    console.error(`创建目录失败: ${dir}`, error)
+                );
                 await fs.writeFile(file, '{}', { mode: 0o644 });
-                console.log(`创建文件: ${file}`);
             }
-            try {
-                await chmod(file, 0o644);
-                console.log(`设置文件权限成功: ${file}`);
-            } catch (error) {
-                console.error(`设置文件权限失败: ${file}`, error);
-            }
+            await chmod(file, 0o644).catch(error => 
+                console.error(`设置文件权限失败: ${file}`, error)
+            );
         }
-        
-        console.log('权限检查和修复完成');
     } catch (error) {
         console.error('权限检查和修复失败:', error);
     }

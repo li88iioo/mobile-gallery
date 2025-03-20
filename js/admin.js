@@ -316,8 +316,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // 设置事件监听器
 function setupEventListeners() {
-    console.log('设置事件监听器');
-    
     // 网站设置表单提交
     const siteSettingsForm = document.getElementById('siteSettingsForm');
     if (siteSettingsForm) {
@@ -352,8 +350,6 @@ function setupEventListeners() {
             await changePassword(currentPassword, newPassword);
         });
     }
-    
-    console.log('事件监听器设置完成');
 }
 
 // 加载网站设置
@@ -479,111 +475,89 @@ async function saveSiteSettings() {
 // 文件验证和预览
 async function validateAndPreviewFile(input, previewId, maxSizeKB) {
     const file = input.files[0];
-    if (file) {
-        console.log(`准备上传文件: ${file.name}, 大小: ${file.size / 1024}KB, 类型: ${file.type}`);
+    if (!file) return;
+    
+    if (file.size > maxSizeKB * 1024) {
+        alert(`文件大小超过${maxSizeKB}KB限制`);
+        input.value = '';
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', input.id === 'siteLogo' ? 'logo' : 'favicon');
+
+    try {
+        const response = await fetch('/api/upload-image', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`上传失败: ${errorData.error || response.statusText}`);
+        }
+
+        const data = await response.json();
+        const imageUrl = data.url;
+        showPreview(previewId, imageUrl);
         
-        if (file.size > maxSizeKB * 1024) {
-            alert(`文件大小超过${maxSizeKB}KB限制`);
-            input.value = '';
-            return;
+        // 更新设置
+        const settings = JSON.parse(localStorage.getItem('siteSettings')) || {};
+        if (input.id === 'siteLogo') {
+            settings.logo = imageUrl;
+        } else {
+            settings.favicon = imageUrl;
+        }
+        
+        localStorage.setItem('siteSettings', JSON.stringify(settings));
+        
+        // 保存到服务器
+        await fetch('/api/save-settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title: settings.title || document.getElementById('siteTitle').value,
+                logo: settings.logo,
+                favicon: settings.favicon
+            }),
+            credentials: 'include'
+        });
+        
+        // 立即应用设置
+        if (input.id === 'siteLogo') {
+            const logoElement = document.getElementById('siteLogo');
+            if (logoElement) {
+                logoElement.src = imageUrl;
+                logoElement.classList.remove('hidden');
+            }
+        } else {
+            const favicon = document.getElementById('favicon');
+            if (favicon) {
+                favicon.href = imageUrl;
+            }
         }
 
-        // 创建 FormData 对象
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('type', input.id === 'siteLogo' ? 'logo' : 'favicon');
-
-        try {
-            console.log(`开始上传文件: ${input.id === 'siteLogo' ? 'logo' : 'favicon'}`);
-            
-            // 上传文件
-            const response = await fetch('/api/upload-image', {
-                method: 'POST',
-                body: formData,
-                credentials: 'include'
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(`上传失败: ${errorData.error || response.statusText}`);
-            }
-
-            const data = await response.json();
-            const imageUrl = data.url; // 获取保存的图片URL
-            console.log(`文件上传成功，URL: ${imageUrl}`);
-
-            // 显示预览
-            showPreview(previewId, imageUrl);
-            
-            // 获取当前的网站设置
-            const settings = JSON.parse(localStorage.getItem('siteSettings')) || {};
-            
-            // 更新设置
-            if (input.id === 'siteLogo') {
-                settings.logo = imageUrl;
-                console.log('Logo URL已保存到设置:', imageUrl);
-            } else {
-                settings.favicon = imageUrl;
-                console.log('Favicon URL已保存到设置:', imageUrl);
-            }
-            
-            // 保存到localStorage作为缓存
-            localStorage.setItem('siteSettings', JSON.stringify(settings));
-            
-            // 保存到服务器
-            await fetch('/api/save-settings', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    title: settings.title || document.getElementById('siteTitle').value,
-                    logo: settings.logo,
-                    favicon: settings.favicon
-                }),
-                credentials: 'include'
-            });
-            
-            console.log('设置已保存到服务器');
-            
-            // 立即应用设置
-            if (input.id === 'siteLogo') {
-                const logoElement = document.getElementById('siteLogo');
-                if (logoElement) {
-                    logoElement.src = imageUrl;
-                    logoElement.classList.remove('hidden');
-                }
-            } else {
-                const favicon = document.getElementById('favicon');
-                if (favicon) {
-                    favicon.href = imageUrl;
-                }
-            }
-
-        } catch (error) {
-            console.error('上传文件失败:', error);
-            alert(`上传文件失败: ${error.message}`);
-            input.value = '';
-        }
+    } catch (error) {
+        console.error('上传文件失败:', error);
+        alert(`上传文件失败: ${error.message}`);
+        input.value = '';
     }
 }
 
 // 显示预览
 function showPreview(previewId, src) {
     const preview = document.getElementById(previewId);
-    if (!preview) {
-        console.error(`预览容器不存在: ${previewId}`);
-        return;
-    }
+    if (!preview) return;
     
     preview.classList.remove('hidden');
     const img = preview.querySelector('img');
     if (img) {
         img.src = src;
-        img.onload = () => console.log(`图片加载成功: ${src}`);
         img.onerror = () => console.error(`图片加载失败: ${src}`);
-    } else {
-        console.error(`预览容器中没有img元素: ${previewId}`);
     }
 }
 
@@ -731,18 +705,13 @@ function displayPhones() {
 
 // 切换已售状态
 async function toggleSoldStatus(id) {
-    console.log('切换产品状态，ID:', id, '类型:', typeof id);
-    
-    // 由于传入的ID可能是字符串，尝试多种方式查找索引
     let index = phones.findIndex(p => p.id === id);
     
-    // 如果找不到，尝试数字比较
     if (index === -1 && !isNaN(id)) {
         const numericId = parseInt(id);
         index = phones.findIndex(p => p.id === numericId);
     }
     
-    // 如果还找不到，尝试字符串比较
     if (index === -1) {
         const stringId = String(id);
         index = phones.findIndex(p => String(p.id) === stringId);
@@ -866,27 +835,21 @@ async function updatePhone(id) {
 
 // 删除手机
 async function deletePhone(id) {
-    console.log('删除产品，ID:', id, '类型:', typeof id);
-    
     if (!confirm('确定要删除这个产品吗？')) return;
     
-    // 由于传入的ID可能是字符串，尝试多种方式过滤
-    // 先获取产品数组的副本
     const newPhones = [];
     let found = false;
     
-    // 遍历每个产品，将不匹配ID的产品保留
     for (const phone of phones) {
-        // 检查ID是否匹配（尝试所有可能的比较方式）
         const idMatches = 
             phone.id === id || 
             (!isNaN(id) && phone.id === parseInt(id)) || 
             (String(phone.id) === String(id));
             
         if (idMatches) {
-            found = true; // 标记找到了要删除的产品
+            found = true;
         } else {
-            newPhones.push(phone); // 保留不匹配的产品
+            newPhones.push(phone);
         }
     }
     
@@ -896,7 +859,6 @@ async function deletePhone(id) {
     }
     
     phones = newPhones;
-    
     await savePhonesToFile();
     displayPhones();
     alert('产品已成功删除');
@@ -984,21 +946,13 @@ async function logout() {
 function setupAddPhoneForm() {
     const addPhoneForm = document.getElementById('addPhoneForm');
     if (addPhoneForm) {
-        // 移除所有现有的事件监听器
         const formClone = addPhoneForm.cloneNode(true);
         addPhoneForm.parentNode.replaceChild(formClone, addPhoneForm);
         
-        // 获取新的表单引用
         const newForm = document.getElementById('addPhoneForm');
-        
-        // 添加新的提交事件处理程序
         newForm.addEventListener('submit', function(e) {
             e.preventDefault();
             addPhone();
         });
-        
-        console.log('重新设置了产品表单提交处理函数');
-    } else {
-        console.error('找不到产品表单元素');
     }
 }

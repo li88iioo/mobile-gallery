@@ -113,51 +113,25 @@ router.get('/last-edit-time', async (req, res) => {
 router.get('/settings', async (req, res) => {
     try {
         const configPath = path.join(__dirname, '..', 'data', 'config.json');
-        console.log('尝试读取配置文件:', configPath);
+        const configData = await fs.readFile(configPath, 'utf8').catch(() => '{}');
+        const config = JSON.parse(configData);
         
-        try {
-            await fs.access(configPath);
-            const configData = await fs.readFile(configPath, 'utf8');
-            console.log('读取到的配置数据:', configData);
-            
-            const config = JSON.parse(configData);
-            console.log('解析后的配置:', config);
-            
-            // 计算配置数据的ETag（可以使用简单的MD5或其他哈希算法）
-            const etag = require('crypto').createHash('md5').update(configData).digest('hex');
-            
-            // 检查客户端发送的If-None-Match头部是否与ETag匹配
-            const clientEtag = req.headers['if-none-match'];
-            if (clientEtag === etag) {
-                // 如果匹配，返回304 Not Modified，告诉客户端使用缓存
-                console.log('配置未更改，使用缓存');
-                return res.status(304).end();
-            }
-            
-            // 设置ETag响应头
-            res.setHeader('ETag', etag);
-            
-            // 设置缓存控制头，启用缓存但要求重新验证
-            res.setHeader('Cache-Control', 'must-revalidate');
-            
-            // 返回必要的设置信息
-            const settings = {
-                title: config.siteTitle || '二手机展示',
-                logo: config.siteLogo || '',
-                favicon: config.siteFavicon || ''
-            };
-            
-            console.log('返回的设置:', settings);
-            res.json(settings);
-        } catch (error) {
-            console.error('读取或解析配置文件失败:', error);
-            // 如果文件不存在或格式错误，返回默认设置
-            res.json({
-                title: '二手机展示',
-                logo: '',
-                favicon: ''
-            });
+        // 计算配置数据的ETag
+        const etag = require('crypto').createHash('md5').update(configData).digest('hex');
+        
+        // 检查客户端发送的If-None-Match头部
+        if (req.headers['if-none-match'] === etag) {
+            return res.status(304).end();
         }
+        
+        res.setHeader('ETag', etag);
+        res.setHeader('Cache-Control', 'must-revalidate');
+        
+        res.json({
+            title: config.siteTitle || '二手机展示',
+            logo: config.siteLogo || '',
+            favicon: config.siteFavicon || ''
+        });
     } catch (error) {
         console.error('获取设置失败:', error);
         res.status(500).json({ error: '获取设置失败' });
@@ -170,42 +144,20 @@ router.post('/save-settings', requireLogin, async (req, res) => {
         const { title, logo, favicon } = req.body;
         const configPath = path.join(__dirname, '..', 'data', 'config.json');
         
-        console.log('正在保存设置:', { title, logo, favicon });
-        console.log('配置文件路径:', configPath);
-        
         // 读取现有配置
-        let config = {};
-        try {
-            await fs.access(configPath);
-            const configData = await fs.readFile(configPath, 'utf8');
-            config = JSON.parse(configData);
-            console.log('读取到现有配置:', config);
-        } catch (error) {
-            console.log('创建新的配置文件');
-        }
+        const configData = await fs.readFile(configPath, 'utf8').catch(() => '{}');
+        const config = JSON.parse(configData);
         
         // 更新配置
         config.siteTitle = title;
         config.siteLogo = logo || '';
         config.siteFavicon = favicon || '';
         
-        console.log('更新后的配置:', config);
-        
         // 确保data目录存在
-        const dataDir = path.join(__dirname, '..', 'data');
-        try {
-            await fs.access(dataDir);
-        } catch (error) {
-            console.log('创建data目录');
-            await fs.mkdir(dataDir, { recursive: true });
-        }
+        await fs.mkdir(path.join(__dirname, '..', 'data'), { recursive: true }).catch(() => {});
         
         // 保存配置
-        const configJson = JSON.stringify(config, null, 2);
-        console.log('即将写入配置:', configJson);
-        
-        await fs.writeFile(configPath, configJson, 'utf8');
-        console.log('配置已保存到文件');
+        await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf8');
         
         res.json({ success: true, message: '设置已保存' });
     } catch (error) {
@@ -218,26 +170,12 @@ router.post('/save-settings', requireLogin, async (req, res) => {
 const storage = multer.diskStorage({
     destination: async function (req, file, cb) {
         const uploadPath = path.join(__dirname, '..', 'uploads', 'images');
-        try {
-            await fs.access(uploadPath);
-            console.log(`上传目录存在: ${uploadPath}`);
-        } catch (error) {
-            console.log(`创建上传目录: ${uploadPath}`);
-            try {
-                await fs.mkdir(uploadPath, { recursive: true });
-            } catch (mkdirError) {
-                console.error(`创建目录失败: ${mkdirError.message}`);
-                return cb(mkdirError);
-            }
-        }
+        await fs.mkdir(uploadPath, { recursive: true }).catch(() => {});
         cb(null, uploadPath);
     },
     filename: function (req, file, cb) {
-        // 获取文件扩展名
         const ext = path.extname(file.originalname);
-        // 生成文件名：类型-时间戳.扩展名
         const filename = `${req.body.type || 'image'}-${Date.now()}${ext}`;
-        console.log(`生成文件名: ${filename}`);
         cb(null, filename);
     }
 });
@@ -248,14 +186,11 @@ const upload = multer({
         fileSize: parseInt(process.env.MAX_FILE_SIZE) || 500 * 1024 // 默认500KB
     },
     fileFilter: function (req, file, cb) {
-        // 检查文件类型
-        console.log(`上传文件类型: ${file.mimetype}`);
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
-        } else {
-            console.error(`文件类型不允许: ${file.mimetype}`);
-            cb(new Error('只允许上传图片文件！'));
+        // 只允许上传图片文件
+        if (!file.mimetype.startsWith('image/')) {
+            return cb(new Error('只允许上传图片文件'));
         }
+        cb(null, true);
     }
 });
 

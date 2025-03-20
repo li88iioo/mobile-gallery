@@ -71,9 +71,6 @@
             const data = await getPhones(null, null, sortBy, sortOrder);
             let phones = data.phones || data; // 兼容旧版API返回格式
             
-            console.log("筛选前的手机数量:", phones.length);
-            console.log("当前价格筛选值:", currentPriceFilter);
-            
             // 确保所有价格都是数字
             phones = phones.map(phone => ({
                 ...phone,
@@ -83,10 +80,8 @@
             // 应用价格筛选
             if (currentPriceFilter === 1000) {
                 phones = phones.filter(phone => phone.price < 1000);
-                console.log("筛选后的手机数量 (1000元以下):", phones.length);
             } else if (currentPriceFilter > 1000) {
                 phones = phones.filter(phone => phone.price >= 1000);
-                console.log("筛选后的手机数量 (1000元以上):", phones.length);
             }
             
             // 更新排序按钮状态
@@ -191,19 +186,14 @@
 
         // 价格筛选
         async function filterPrice(price, event) {
-            console.log(`执行价格筛选: ${price}`);
-            // 保存当前筛选价格到全局变量
             currentPriceFilter = price;
             
             const buttons = document.querySelectorAll('.filter-btn');
-            
-            // 更新按钮样式
             buttons.forEach(btn => btn.classList.remove('active'));
             if (event && event.target) {
                 event.target.classList.add('active');
             }
 
-            // 使用当前的排序方式重新渲染
             renderPhones(1, currentSortBy, currentSortOrder);
         }
 
@@ -469,38 +459,24 @@
         // 加载网站设置
         async function loadSiteSettings() {
             try {
-                // 从服务器获取设置，浏览器会自动处理ETag和304响应
                 const response = await fetch('/api/settings');
                 
-                // 如果服务器返回304，fetch API会抛出错误，我们捕获并使用本地缓存
                 if (!response.ok && response.status !== 304) {
                     throw new Error('无法从服务器获取设置');
                 }
                 
-                // 只有在有新数据时才解析JSON
+                let settings;
                 if (response.status !== 304) {
-                    const settings = await response.json();
-                    console.log('从服务器获取的设置:', settings);
-                    
-                    // 缓存到localStorage
+                    settings = await response.json();
                     localStorage.setItem('siteSettings', JSON.stringify(settings));
-                    
-                    // 应用设置到UI
-                    applySettings(settings);
                 } else {
-                    console.log('使用缓存的设置');
-                    // 304情况，使用本地缓存
-                    const settings = JSON.parse(localStorage.getItem('siteSettings')) || {};
-                    
-                    // 应用设置到UI
-                    applySettings(settings);
+                    settings = JSON.parse(localStorage.getItem('siteSettings')) || {};
                 }
+                
+                applySettings(settings);
             } catch (error) {
                 console.error('加载网站设置失败:', error);
-                // 出错时尝试从本地缓存加载
                 const settings = JSON.parse(localStorage.getItem('siteSettings')) || {};
-                
-                // 应用设置到UI
                 applySettings(settings);
             }
         }
@@ -571,38 +547,24 @@
         // 加载Logo和背景
         async function loadLogoAndBackground() {
             try {
-                // 从服务器获取设置，浏览器会自动处理ETag和304响应
                 const response = await fetch('/api/settings');
                 
-                // 如果服务器返回304，fetch API会抛出错误，我们捕获并使用本地缓存
                 if (!response.ok && response.status !== 304) {
                     throw new Error('无法从服务器获取设置');
                 }
                 
-                // 只有在有新数据时才解析JSON
+                let settings;
                 if (response.status !== 304) {
-                    const settings = await response.json();
-                    console.log('从服务器获取的设置:', settings);
-                    
-                    // 缓存到localStorage
+                    settings = await response.json();
                     localStorage.setItem('siteSettings', JSON.stringify(settings));
-                    
-                    // 应用设置到UI
-                    applySettings(settings);
                 } else {
-                    console.log('使用缓存的设置');
-                    // 304情况，使用本地缓存
-                    const settings = JSON.parse(localStorage.getItem('siteSettings')) || {};
-                    
-                    // 应用设置到UI
-                    applySettings(settings);
+                    settings = JSON.parse(localStorage.getItem('siteSettings')) || {};
                 }
+                
+                applySettings(settings);
             } catch (error) {
                 console.error('加载网站设置失败:', error);
-                // 出错时尝试从本地缓存加载
                 const settings = JSON.parse(localStorage.getItem('siteSettings')) || {};
-                
-                // 应用设置到UI
                 applySettings(settings);
             }
         }
