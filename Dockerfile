@@ -7,8 +7,14 @@ WORKDIR /app
 # 复制package.json和package-lock.json（如果存在）
 COPY package*.json ./
 
-# 安装依赖
-RUN npm install --only=production
+# 安装所有依赖（包括开发依赖）
+RUN npm install
+
+# 复制所有源代码
+COPY . .
+
+# 构建 CSS
+RUN npm run build:css
 
 # 最终阶段
 FROM node:16-alpine
@@ -19,11 +25,12 @@ RUN apk add --no-cache dos2unix
 # 设置工作目录
 WORKDIR /app
 
-# 从构建阶段复制node_modules
-COPY --from=builder /app/node_modules ./node_modules
-
 # 复制应用代码
 COPY . .
+
+# 从构建阶段复制构建的文件
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/css/tailwind.css ./css/tailwind.css
 
 # 修复文件编码和行尾符问题
 RUN dos2unix server.js && \

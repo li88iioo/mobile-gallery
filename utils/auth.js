@@ -1,5 +1,10 @@
 const crypto = require('crypto');
 const fs = require('fs').promises;
+const path = require('path');
+
+// 用于文件锁的变量
+let configLock = false;
+let configQueue = [];
 
 // 密码加密函数
 function hashPassword(password) {
@@ -28,9 +33,42 @@ async function readConfig() {
     }
 }
 
-// 保存配置
+// 保存配置（带锁机制）
 async function saveConfig(config) {
-    await fs.writeFile('data/config.json', JSON.stringify(config, null, 2));
+    // 如果文件正在被写入，将当前操作加入队列
+    if (configLock) {
+        await new Promise(resolve => configQueue.push(resolve));
+    }
+    
+    try {
+        configLock = true;
+        
+        // 读取当前配置
+        let currentConfig = await readConfig();
+        
+        // 合并配置，保持密码相关字段不变（如果存在）
+        if (currentConfig.isInitialized && !config.passwordHash) {
+            config = {
+                ...config,
+                passwordHash: currentConfig.passwordHash,
+                salt: currentConfig.salt,
+                isInitialized: currentConfig.isInitialized
+            };
+        }
+        
+        // 写入文件
+        await fs.writeFile('data/config.json', JSON.stringify(config, null, 2));
+        
+        // 确保文件写入成功
+        await fs.access('data/config.json');
+    } finally {
+        configLock = false;
+        // 处理队列中的下一个操作
+        if (configQueue.length > 0) {
+            const next = configQueue.shift();
+            next();
+        }
+    }
 }
 
 // 确保配置文件存在
