@@ -1,4 +1,5 @@
 const fs = require('fs').promises;
+const path = require('path');
 
 // 确保data目录和文件存在
 async function ensureDataDirectory() {
@@ -27,15 +28,45 @@ async function ensureDataDirectory() {
     }
 }
 
-// 读取手机数据
+// 读取手机数据(优化：添加缓存机制)
+let phonesCache = null;
+let phonesLastRead = 0;
+const CACHE_TTL = 30000; // 缓存有效期30秒
+
+/**
+ * 读取手机数据，带缓存优化
+ */
 async function readPhones() {
+    const currentTime = Date.now();
+    
+    // 如果缓存存在且未过期，直接返回缓存
+    if (phonesCache && (currentTime - phonesLastRead < CACHE_TTL)) {
+        return phonesCache;
+    }
+    
     try {
-        const data = await fs.readFile('data/phones.json', 'utf8');
-        const parsed = JSON.parse(data);
-        return parsed || { phones: [], lastEditTime: new Date().toISOString() };
+        await ensureDataDirectory();
+        const filePath = path.join(__dirname, '../data/phones.json');
+        
+        try {
+            const data = await fs.readFile(filePath, 'utf8');
+            phonesCache = JSON.parse(data);
+            phonesLastRead = currentTime;
+            return phonesCache;
+        } catch (error) {
+            if (error.code === 'ENOENT') {
+                // 文件不存在，创建一个空数据
+                const emptyData = { phones: [], lastEditTime: new Date().toISOString() };
+                await savePhones(emptyData);
+                phonesCache = emptyData;
+                phonesLastRead = currentTime;
+                return emptyData;
+            }
+            throw error;
+        }
     } catch (error) {
-        console.error('读取产品数据失败:', error);
-        return { phones: [], lastEditTime: new Date().toISOString() };
+        console.error('读取手机数据失败:', error);
+        throw new Error('无法读取手机数据');
     }
 }
 

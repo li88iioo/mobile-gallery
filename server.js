@@ -45,24 +45,27 @@ app.use(session({
     }
 }));
 
+// 统一的静态文件缓存选项
+const staticCacheOptions = {
+    etag: true,
+    lastModified: true
+};
+
 // 静态文件服务
 app.use('/js', express.static(path.join(__dirname, 'js'), {
-    maxAge: `${process.env.STATIC_CACHE_MAX_AGE_JS_CSS || 86400}s`, // 默认缓存1天
-    etag: true
+    ...staticCacheOptions,
+    maxAge: `${process.env.STATIC_CACHE_MAX_AGE_JS_CSS || 86400}s` // 默认缓存1天
 }));
 app.use('/css', express.static(path.join(__dirname, 'css'), {
-    maxAge: `${process.env.STATIC_CACHE_MAX_AGE_JS_CSS || 86400}s`, // 默认缓存1天
-    etag: true
+    ...staticCacheOptions,
+    maxAge: `${process.env.STATIC_CACHE_MAX_AGE_JS_CSS || 86400}s` // 默认缓存1天
 }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
-    // 图片可以缓存一天，但使用ETag和Last-Modified检测变化
+    ...staticCacheOptions,
     maxAge: `${process.env.STATIC_CACHE_MAX_AGE_IMAGES || 86400}s`, // 1天
-    etag: true,
-    lastModified: true,
     setHeaders: function (res, path, stat) {
         // 对于logo和图标文件，设置更长的缓存时间但要求验证
         if (path.includes('logo') || path.includes('favicon')) {
-            // 设置缓存控制头，允许缓存但要求在使用前验证是否更改
             res.set('Cache-Control', 'public, max-age=604800, must-revalidate'); // 7天
         }
     }

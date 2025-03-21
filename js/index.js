@@ -459,7 +459,13 @@
         // 加载网站设置
         async function loadSiteSettings() {
             try {
-                const response = await fetch('/api/settings');
+                const response = await fetch('/api/settings', {
+                    credentials: 'include',
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
                 
                 if (!response.ok && response.status !== 304) {
                     throw new Error('无法从服务器获取设置');
@@ -473,6 +479,7 @@
                     settings = JSON.parse(localStorage.getItem('siteSettings')) || {};
                 }
                 
+                console.log('已加载网站设置:', settings);
                 applySettings(settings);
             } catch (error) {
                 console.error('加载网站设置失败:', error);
@@ -483,6 +490,8 @@
 
         // 将设置应用到UI的辅助函数
         function applySettings(settings) {
+            console.log('正在应用设置:', settings);
+            
             // 更新标题
             if (settings.title) {
                 document.title = settings.title;
@@ -498,15 +507,20 @@
                 if (logoElement) {
                     logoElement.src = settings.logo;
                     logoElement.classList.remove('hidden');
+                    console.log('已设置Logo:', settings.logo);
                 }
             }
             
             // 更新Favicon
             if (settings.favicon) {
-                const favicon = document.getElementById('favicon');
-                if (favicon) {
-                    favicon.href = settings.favicon;
+                let faviconLink = document.querySelector('link[rel="icon"]');
+                if (!faviconLink) {
+                    faviconLink = document.createElement('link');
+                    faviconLink.rel = 'icon';
+                    document.head.appendChild(faviconLink);
                 }
+                faviconLink.href = settings.favicon;
+                console.log('已设置Favicon:', settings.favicon);
             }
         }
 
@@ -567,4 +581,88 @@
                 const settings = JSON.parse(localStorage.getItem('siteSettings')) || {};
                 applySettings(settings);
             }
+        }
+
+        /**
+         * 显示通知消息
+         * @param {string} message - 消息内容
+         * @param {string} type - 消息类型: 'success', 'error', 'info', 'warning'
+         * @param {number} duration - 显示持续时间(毫秒)
+         * @param {string} title - 可选的标题
+         */
+        function showToast(message, type = 'info', duration = 3000, title = '') {
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
+
+            // 创建toast元素
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            
+            // 准备图标
+            let icon = '';
+            switch (type) {
+                case 'success':
+                    icon = '<i class="fas fa-check-circle toast-icon"></i>';
+                    break;
+                case 'error':
+                    icon = '<i class="fas fa-exclamation-circle toast-icon"></i>';
+                    break;
+                case 'warning':
+                    icon = '<i class="fas fa-exclamation-triangle toast-icon"></i>';
+                    break;
+                case 'info':
+                default:
+                    icon = '<i class="fas fa-info-circle toast-icon"></i>';
+                    break;
+            }
+            
+            // 构建内容
+            let content = `
+                ${icon}
+                <div class="toast-content">
+                    ${title ? `<div class="toast-title">${title}</div>` : ''}
+                    <div class="toast-message">${message}</div>
+                </div>
+                <div class="toast-close" onclick="this.parentElement.remove()">
+                    <i class="fas fa-times"></i>
+                </div>
+                <div class="toast-progress">
+                    <div class="toast-progress-bar"></div>
+                </div>
+            `;
+            
+            toast.innerHTML = content;
+            
+            // 添加到容器
+            container.appendChild(toast);
+            
+            // 触发重绘以应用初始样式
+            toast.offsetHeight;
+            
+            // 显示toast
+            toast.classList.add('show');
+            
+            // 设置进度条动画
+            const progressBar = toast.querySelector('.toast-progress-bar');
+            progressBar.style.transition = `width ${duration}ms linear`;
+            progressBar.style.width = '0%';
+            
+            // 设置自动关闭
+            const timeout = setTimeout(() => {
+                toast.classList.remove('show');
+                
+                // 动画结束后移除元素
+                toast.addEventListener('transitionend', () => {
+                    toast.remove();
+                });
+            }, duration);
+            
+            // 点击关闭按钮时清除定时器
+            const closeButton = toast.querySelector('.toast-close');
+            closeButton.addEventListener('click', () => {
+                clearTimeout(timeout);
+                toast.classList.remove('show');
+            });
+            
+            return toast;
         }

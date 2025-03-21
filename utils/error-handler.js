@@ -35,32 +35,37 @@ const globalErrorHandler = (err, req, res, next) => {
     let errorMessage = err.message || 'Internal Server Error';
     let errorCode = err.errorCode || 'INTERNAL_ERROR';
     
-    // 记录错误
-    console.error('错误详情:', {
-        message: err.message,
-        stack: err.stack,
-        statusCode,
-        errorCode,
+    // 合并错误信息
+    const errorDetails = {
+        message: errorMessage,
+        code: errorCode,
         path: req.path,
         method: req.method,
         timestamp: new Date().toISOString()
-    });
+    };
+    
+    // 记录错误 - 只在生产环境记录简化版本，开发环境记录完整堆栈
+    console.error(`[ERROR] ${errorDetails.method} ${errorDetails.path} - ${statusCode}:`, 
+        process.env.NODE_ENV === 'development' 
+            ? { ...errorDetails, stack: err.stack } 
+            : errorDetails
+    );
     
     // 开发环境下返回更多错误信息
     if (process.env.NODE_ENV === 'development') {
-        res.status(statusCode).json({
+        return res.status(statusCode).json({
             error: errorMessage,
             errorCode,
             stack: err.stack,
-            path: req.path
-        });
-    } else {
-        // 生产环境下返回简洁的错误信息
-        res.status(statusCode).json({
-            error: errorMessage,
-            errorCode
+            details: errorDetails
         });
     }
+    
+    // 生产环境只返回有限信息
+    res.status(statusCode).json({
+        error: errorMessage,
+        errorCode
+    });
 };
 
 /**

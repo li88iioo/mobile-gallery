@@ -166,6 +166,94 @@ router.post('/save-settings', requireLogin, async (req, res) => {
     }
 });
 
+// 添加新的/api/settings POST端点，保持向后兼容
+router.post('/settings', requireLogin, async (req, res) => {
+    try {
+        const { title, logo, favicon } = req.body;
+        const configPath = path.join(__dirname, '..', 'data', 'config.json');
+        
+        // 读取现有配置
+        const configData = await fs.readFile(configPath, 'utf8').catch(() => '{}');
+        const config = JSON.parse(configData);
+        
+        // 更新配置
+        config.siteTitle = title;
+        config.siteLogo = logo || '';
+        config.siteFavicon = favicon || '';
+        
+        // 确保data目录存在
+        await fs.mkdir(path.join(__dirname, '..', 'data'), { recursive: true }).catch(() => {});
+        
+        // 保存配置
+        await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf8');
+        
+        res.json({ success: true, message: '设置已保存' });
+    } catch (error) {
+        console.error('保存设置失败:', error);
+        res.status(500).json({ error: '保存设置失败' });
+    }
+});
+
+// 删除Logo和Favicon文件
+router.post('/delete-file', requireLogin, async (req, res) => {
+    try {
+        const { type } = req.body;
+        
+        if (!type || (type !== 'logo' && type !== 'favicon')) {
+            return res.status(400).json({ error: '无效的文件类型' });
+        }
+        
+        const configPath = path.join(__dirname, '..', 'data', 'config.json');
+        
+        // 读取现有配置
+        const configData = await fs.readFile(configPath, 'utf8').catch(() => '{}');
+        const config = JSON.parse(configData);
+        
+        let fileUrl = '';
+        
+        // 根据类型获取文件URL
+        if (type === 'logo') {
+            fileUrl = config.siteLogo;
+            config.siteLogo = '';
+        } else if (type === 'favicon') {
+            fileUrl = config.siteFavicon;
+            config.siteFavicon = '';
+        }
+        
+        // 保存更新的配置
+        await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf8');
+        
+        // 如果文件URL存在，尝试删除实际文件
+        if (fileUrl) {
+            try {
+                // 从URL提取文件名
+                const urlParts = fileUrl.split('/');
+                const filename = urlParts[urlParts.length - 1];
+                
+                if (filename) {
+                    const filePath = path.join(__dirname, '..', 'uploads', 'images', filename);
+                    
+                    // 检查文件是否存在并删除
+                    const fileExists = await fs.access(filePath).then(() => true).catch(() => false);
+                    
+                    if (fileExists) {
+                        await fs.unlink(filePath);
+                        console.log(`已删除文件: ${filePath}`);
+                    }
+                }
+            } catch (fileError) {
+                console.error(`删除文件出错:`, fileError);
+                // 不中断响应，因为配置已更新
+            }
+        }
+        
+        res.json({ success: true, message: `${type === 'logo' ? 'Logo' : '网站图标'}已成功删除` });
+    } catch (error) {
+        console.error('删除文件失败:', error);
+        res.status(500).json({ error: '删除文件失败' });
+    }
+});
+
 // 配置文件上传
 const storage = multer.diskStorage({
     destination: async function (req, file, cb) {

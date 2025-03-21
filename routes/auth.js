@@ -88,4 +88,73 @@ router.get('/check-auth', (req, res) => {
     res.json({ isLoggedIn: !!req.session.isLoggedIn });
 });
 
+// 检查管理员账号是否已配置
+router.get('/config/check-admin', async (req, res) => {
+    try {
+        console.log('检查管理员账号配置');
+        const config = await readConfig();
+        res.json({ 
+            configured: config.isInitialized,
+            username: config.username
+        });
+    } catch (error) {
+        console.error('检查管理员账号配置错误:', error);
+        res.status(500).json({ error: '检查配置失败' });
+    }
+});
+
+// 设置管理员账号
+router.post('/config/set-admin', async (req, res) => {
+    try {
+        console.log('设置管理员账号:', req.body.username);
+        const { username, password } = req.body;
+        
+        if (!username || !password) {
+            return res.status(400).json({ error: '用户名和密码不能为空' });
+        }
+        
+        if (password.length < 6) {
+            return res.status(400).json({ error: '密码长度至少6位' });
+        }
+        
+        const config = await readConfig();
+        
+        // 如果已初始化且用户未登录，只有管理员可以更改设置
+        if (config.isInitialized && !req.session.isLoggedIn) {
+            return res.status(403).json({ error: '无权限操作' });
+        }
+        
+        // 更新配置
+        const { salt, hash } = hashPassword(password);
+        await saveConfig({
+            ...config,
+            username,
+            passwordHash: hash,
+            salt: salt,
+            isInitialized: true
+        });
+        
+        // 设置成功后，自动登录
+        req.session.isLoggedIn = true;
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('设置管理员账号错误:', error);
+        res.status(500).json({ error: '设置管理员账号失败' });
+    }
+});
+
+// 获取当前用户名
+router.get('/get-username', requireLogin, async (req, res) => {
+    try {
+        const config = await readConfig();
+        res.json({ 
+            username: config.username || 'admin'
+        });
+    } catch (error) {
+        console.error('获取用户名错误:', error);
+        res.status(500).json({ error: '获取用户名失败', username: 'admin' });
+    }
+});
+
 module.exports = router; 
