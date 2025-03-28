@@ -4,6 +4,11 @@ const DEFAULT_CREDENTIALS = {
     password: 'admin123'
 };
 
+// 添加全局设置缓存
+let cachedSettings = null;
+let lastSettingsUpdate = 0;
+const SETTINGS_CACHE_TIME = 60000; // 1分钟缓存时间
+
 // 初始化密码显示/隐藏功能
 function initPasswordToggle() {
     // 密码显示/隐藏切换
@@ -113,7 +118,7 @@ function showChangePasswordForm() {
         </button>
     `;
 
-    loginForm.onsubmit = function(e) {
+    loginForm.onsubmit = async function(e) {
         e.preventDefault();
         const newPassword = document.getElementById('newPassword').value;
         const confirmPassword = document.getElementById('confirmPassword').value;
@@ -131,13 +136,34 @@ function showChangePasswordForm() {
             return;
         }
 
-        // 保存新密码
-        localStorage.setItem('adminPassword', btoa(newPassword)); // 简单加密
-        localStorage.setItem('passwordChanged', 'true');
-        
-        // 登录成功
-        sessionStorage.setItem('isLoggedIn', 'true');
-        window.location.href = '/admin';
+        // 使用API修改密码，不再使用本地存储
+        try {
+            const response = await fetch('/api/change-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    currentPassword: 'admin123', // 默认密码
+                    newPassword
+                })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                showToast('密码修改成功！', 'success');
+                setTimeout(() => {
+                    window.location.href = '/admin';
+                }, 1000);
+            } else {
+                errorMessage.textContent = data.error || '密码修改失败';
+                errorMessage.classList.remove('hidden');
+            }
+        } catch (error) {
+            console.error('密码修改请求失败:', error);
+            errorMessage.textContent = '网络错误，请稍后重试';
+            errorMessage.classList.remove('hidden');
+        }
     };
 }
 
@@ -228,196 +254,320 @@ function showToast(message, type = 'info', duration = 3000, title = '') {
 // 加载网站设置
 async function loadSiteSettings() {
     try {
-        const response = await fetch('/api/settings');
-        if (response.ok) {
-            const settings = await response.json();
-            
-            // 设置网站标题
-            if (settings.title) {
-                document.title = `登录 - ${settings.title}`;
-            }
-            
-            // 设置网站图标
-            if (settings.favicon) {
-                const faviconElement = document.getElementById('favicon');
-                if (faviconElement) {
-                    faviconElement.href = settings.favicon;
-                }
-            }
+        // 如果有缓存且缓存时间未过期，直接使用缓存
+        const now = Date.now();
+        if (cachedSettings && (now - lastSettingsUpdate < SETTINGS_CACHE_TIME)) {
+            applySettings(cachedSettings);
+            return cachedSettings;
         }
+        
+        const response = await fetch('/api/settings', {
+            credentials: 'include',
+            headers: {
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('无法从服务器获取设置');
+        }
+        
+        const settings = await response.json();
+        
+        // 更新缓存和时间戳
+        cachedSettings = settings;
+        lastSettingsUpdate = now;
+        
+        // 应用设置
+        applySettings(settings);
+        
+        return settings;
     } catch (error) {
         console.error('加载网站设置失败:', error);
+        return null;
     }
 }
 
-// 更新登录处理逻辑，使用Toast通知
-document.addEventListener('DOMContentLoaded', async () => {
+// 应用设置到UI
+function applySettings(settings) {
+    if (!settings) return;
+    
+    // 设置网站标题
+    if (settings.title) {
+        document.title = `登录 - ${settings.title}`;
+    }
+    
+    // 设置网站图标
+    if (settings.favicon) {
+        const faviconElement = document.getElementById('favicon');
+        if (faviconElement) {
+            faviconElement.href = settings.favicon;
+        }
+    }
+}
+
+// 主初始化函数
+async function initializePage() {
     try {
+        // 清除可能存在的本地存储（早期版本可能使用）
+        localStorage.removeItem('adminPassword');
+        localStorage.removeItem('passwordChanged');
+        
+        // 检查登录状态
+        try {
+            const authResponse = await fetch('/api/check-auth', {
+                credentials: 'include'
+            });
+            const authData = await authResponse.json();
+            
+            if (authData.isLoggedIn) {
+                // 如果已登录，直接跳转到管理页面
+                window.location.href = '/admin';
+                return;
+            }
+        } catch (error) {
+            console.error('检查登录状态失败:', error);
+        }
+        
+        // 加载网站设置
+        await loadSiteSettings();
+        
+        // 初始化密码显示/隐藏功能
+        initPasswordToggle();
+        
         // 检查管理员是否已配置
         const configResponse = await fetch('/api/config/check-admin');
         const configData = await configResponse.json();
         
         if (!configData.configured) {
-            // 设置初始密码模式 - 更新表单以包含确认密码字段
-            const loginForm = document.getElementById('loginForm');
-            const pageTitle = document.querySelector('h1');
-            if (pageTitle) {
-                pageTitle.textContent = '创建管理员账号';
-            }
-            
-            loginForm.innerHTML = `
-                <div class="text-center mb-4 text-blue-600">
-                    <p>首次访问系统，请创建管理员账号</p>
-                </div>
-                <div>
-                    <label for="username" class="block text-sm font-medium text-gray-700 mb-1">用户名</label>
-                    <input type="text" id="username" name="username" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" value="admin">
-                </div>
-                <div>
-                    <label for="password" class="block text-sm font-medium text-gray-700 mb-1">密码</label>
-                    <div class="relative">
-                        <input type="password" id="password" name="password" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
-                        <button type="button" id="togglePassword" class="password-toggle">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                </div>
-                <div>
-                    <label for="confirmPassword" class="block text-sm font-medium text-gray-700 mb-1">确认密码</label>
-                    <div class="relative">
-                        <input type="password" id="confirmPassword" name="confirmPassword" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
-                        <button type="button" id="toggleConfirmPassword" class="password-toggle">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                </div>
-                <div id="errorMessage" class="text-red-500 text-center hidden"></div>
-                <div>
-                    <button type="submit" class="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition duration-200">创建账号</button>
-                </div>
-                <div class="text-center text-sm text-gray-500 mt-2">
-                    <p>创建后将自动登录到管理后台</p>
-                </div>
-            `;
-            
-            const usernameInput = document.getElementById('username');
-            const passwordInput = document.getElementById('password');
-            const confirmPasswordInput = document.getElementById('confirmPassword');
-            
-            loginForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
-                const newPassword = passwordInput.value;
-                const confirmPassword = confirmPasswordInput.value;
-                
-                if (confirmPassword !== newPassword) {
-                    showToast('两次输入的密码不一致', 'error');
-                    return;
-                }
-                
-                if (newPassword.length < 6) {
-                    showToast('密码长度至少6位', 'warning');
-                    return;
-                }
-                
-                try {
-                    const response = await fetch('/api/config/set-admin', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            username: usernameInput.value,
-                            password: newPassword
-                        })
-                    });
-                    
-                    const data = await response.json();
-                    if (data.success) {
-                        showToast('管理员账号创建成功！', 'success');
-                        setTimeout(() => {
-                            window.location.href = '/admin';
-                        }, 1500);
-                    } else {
-                        showToast(data.error || '创建账号失败', 'error');
-                    }
-                } catch (error) {
-                    console.error('创建账号错误:', error);
-                    showToast('网络错误，请稍后重试', 'error');
-                }
-            });
-            
-            // 初始化密码显示/隐藏功能
-            setTimeout(() => initPasswordToggle(), 100);
+            // 设置初始密码模式 - 处理首次访问
+            setupInitialAdminForm();
         } else {
             // 正常登录模式
-            const loginForm = document.getElementById('loginForm');
-            const usernameInput = document.getElementById('username');
-            const passwordInput = document.getElementById('password');
-            
-            loginForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
-                try {
-                    const response = await fetch('/api/login', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            username: usernameInput.value,
-                            password: passwordInput.value
-                        })
-                    });
-                    
-                    const data = await response.json();
-                    if (data.success) {
-                        showToast('登录成功！', 'success');
-                        setTimeout(() => {
-                            window.location.href = '/admin';
-                        }, 1000);
-                    } else {
-                        showToast(data.error || '登录失败', 'error');
-                    }
-                } catch (error) {
-                    console.error('登录错误:', error);
-                    showToast('网络错误，请稍后重试', 'error');
-                }
-            });
+            setupNormalLoginForm();
         }
     } catch (error) {
         console.error('初始化登录页面错误:', error);
         showToast('加载页面失败，请刷新重试', 'error');
     }
-});
+}
 
-// 页面加载时检查登录状态
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        const response = await fetch('/api/check-auth', {
-            credentials: 'include'
-        });
-        const data = await response.json();
-        
-        if (data.isLoggedIn) {
-            // 如果已登录，直接跳转到管理页面
-            window.location.href = '/admin';
-        }
-    } catch (error) {
-        console.error('检查登录状态失败:', error);
+// 设置首次访问的管理员创建表单
+function setupInitialAdminForm() {
+    const loginForm = document.getElementById('loginForm');
+    const pageTitle = document.querySelector('h1');
+    if (pageTitle) {
+        pageTitle.textContent = '创建管理员账号';
     }
-});
-
-// 页面加载完成后执行
-document.addEventListener('DOMContentLoaded', function() {
-    // 加载网站设置
-    loadSiteSettings();
     
-    // 绑定登录表单事件
-    document.getElementById('loginForm').addEventListener('submit', function(e) {
-        // existing login form code...
+    loginForm.innerHTML = `
+        <div class="text-center mb-4 text-blue-600">
+            <p>首次访问系统，请创建管理员账号</p>
+        </div>
+        <div>
+            <label for="username" class="block text-sm font-medium text-gray-700 mb-1">用户名</label>
+            <input type="text" id="username" name="username" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" value="admin">
+        </div>
+        <div>
+            <label for="password" class="block text-sm font-medium text-gray-700 mb-1">密码</label>
+            <div class="relative">
+                <input type="password" id="password" name="password" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                <button type="button" id="togglePassword" class="password-toggle">
+                    <i class="fas fa-eye"></i>
+                </button>
+            </div>
+        </div>
+        <div>
+            <label for="confirmPassword" class="block text-sm font-medium text-gray-700 mb-1">确认密码</label>
+            <div class="relative">
+                <input type="password" id="confirmPassword" name="confirmPassword" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                <button type="button" id="toggleConfirmPassword" class="password-toggle">
+                    <i class="fas fa-eye"></i>
+                </button>
+            </div>
+        </div>
+        <div id="errorMessage" class="text-red-500 text-center hidden"></div>
+        <div>
+            <button type="submit" class="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition duration-200">创建账号</button>
+        </div>
+        <div class="text-center text-sm text-gray-500 mt-2">
+            <p>创建后将自动登录到管理后台</p>
+        </div>
+    `;
+    
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const confirmPasswordInput = document.getElementById('confirmPassword');
+    const errorMessageElement = document.getElementById('errorMessage');
+    
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        // 获取并清理表单数据
+        const username = usernameInput.value.trim();
+        const newPassword = passwordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
+        
+        // 清除之前的错误信息
+        errorMessageElement.classList.add('hidden');
+        
+        // 客户端表单验证
+        if (!username || !newPassword || !confirmPassword) {
+            errorMessageElement.textContent = '请填写所有字段';
+            errorMessageElement.classList.remove('hidden');
+            return;
+        }
+        
+        if (confirmPassword !== newPassword) {
+            errorMessageElement.textContent = '两次输入的密码不一致';
+            errorMessageElement.classList.remove('hidden');
+            return;
+        }
+        
+        if (newPassword.length < 6) {
+            errorMessageElement.textContent = '密码长度至少6位';
+            errorMessageElement.classList.remove('hidden');
+            return;
+        }
+        
+        // 禁用按钮，显示加载状态
+        const submitBtn = loginForm.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 创建中...';
+        
+        try {
+            const response = await fetch('/api/config/set-admin', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username,
+                    password: newPassword
+                }),
+                credentials: 'same-origin' // 确保CSRF保护
+            });
+            
+            // 检查HTTP状态
+            if (!response.ok) {
+                throw new Error(response.status === 429 
+                    ? '请求过于频繁，请稍后再试' 
+                    : '创建账号失败');
+            }
+            
+            const data = await response.json();
+            if (data.success) {
+                showToast('管理员账号创建成功！', 'success');
+                setTimeout(() => {
+                    window.location.href = '/admin';
+                }, 1500);
+            } else {
+                // 使用通用错误消息，避免泄露详细信息
+                errorMessageElement.textContent = data.error || '创建账号失败';
+                errorMessageElement.classList.remove('hidden');
+            }
+        } catch (error) {
+            // 避免显示详细错误
+            errorMessageElement.textContent = '网络错误或请求失败，请稍后重试';
+            errorMessageElement.classList.remove('hidden');
+        } finally {
+            // 恢复按钮状态
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+        }
     });
     
-    // 初始化密码显示/隐藏功能
-    initPasswordToggle();
-});
+    // 重新初始化密码显示/隐藏功能
+    setTimeout(() => initPasswordToggle(), 100);
+}
+
+// 设置正常登录表单
+function setupNormalLoginForm() {
+    const loginForm = document.getElementById('loginForm');
+    
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        const errorMessageElement = document.getElementById('errorMessage');
+        
+        // 清除之前的错误信息
+        if (errorMessageElement) {
+            errorMessageElement.classList.add('hidden');
+        }
+        
+        // 获取输入值
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value;
+        
+        // 验证输入
+        if (!username || !password) {
+            if (errorMessageElement) {
+                errorMessageElement.textContent = '请填写用户名和密码';
+                errorMessageElement.classList.remove('hidden');
+            }
+            return;
+        }
+        
+        // 禁用按钮，显示加载状态
+        const submitBtn = loginForm.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 登录中...';
+        
+        try {
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username,
+                    password
+                }),
+                credentials: 'same-origin' // 确保CSRF保护
+            });
+            
+            // 检查HTTP状态
+            if (!response.ok) {
+                throw new Error(response.status === 429 
+                    ? '请求过于频繁，请稍后再试' 
+                    : '登录失败');
+            }
+            
+            const data = await response.json();
+            if (data.success) {
+                showToast('登录成功！', 'success');
+                setTimeout(() => {
+                    window.location.href = '/admin';
+                }, 1000);
+            } else {
+                // 为登录错误提供适当的反馈
+                if (errorMessageElement) {
+                    errorMessageElement.textContent = data.error || '用户名或密码错误';
+                    errorMessageElement.classList.remove('hidden');
+                } else {
+                    showToast(data.error || '用户名或密码错误', 'error');
+                }
+            }
+        } catch (error) {
+            // 避免显示详细错误
+            if (errorMessageElement) {
+                errorMessageElement.textContent = '网络错误，请稍后重试';
+                errorMessageElement.classList.remove('hidden');
+            } else {
+                showToast('网络错误，请稍后重试', 'error');
+            }
+        } finally {
+            // 恢复按钮状态
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+        }
+    });
+}
+
+// 页面加载完成后执行初始化
+document.addEventListener('DOMContentLoaded', initializePage);

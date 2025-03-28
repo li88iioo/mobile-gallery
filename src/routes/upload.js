@@ -183,9 +183,45 @@ router.post('/delete-file', requireLogin, async (req, res) => {
                     fileUrl = config.siteFavicon;
                 } else if (type === 'wechatQR') {
                     fileUrl = config.contact && config.contact.wechatQR;
+                    
+                    // 如果配置中没有URL，尝试直接查找文件
+                    if (!fileUrl) {
+                        const imagesPath = path.join(__dirname, '..', 'uploads', 'images');
+                        try {
+                            // 确保uploads/images目录存在
+                            await fs.mkdir(imagesPath, { recursive: true });
+                            
+                            // 查找所有可能的微信二维码文件（不同扩展名）
+                            const files = await fs.readdir(imagesPath);
+                            
+                            const wechatQRFiles = files.filter(file => file.startsWith('wechat-qrcode.'));
+                            
+                            if (wechatQRFiles.length > 0) {
+                                // 使用找到的第一个文件
+                                fileUrl = `/uploads/images/${wechatQRFiles[0]}`;
+                            }
+                        } catch (err) {
+                            console.error('读取uploads/images目录失败:', err);
+                        }
+                    }
                 }
                 
-                if (!fileUrl) {
+                if (!fileUrl && type === 'wechatQR') {
+                    // 对于微信二维码，即使没有找到URL也要清空配置并返回成功
+                    // 因为用户可能希望重置微信二维码设置
+                    if (config.contact) {
+                        const contact = {
+                            ...config.contact,
+                            wechatQR: ''
+                        };
+                        await saveSettings(undefined, undefined, undefined, contact);
+                    }
+                    
+                    return res.json({ 
+                        success: true, 
+                        message: '微信二维码已重置' 
+                    });
+                } else if (!fileUrl) {
                     return res.status(404).json({ 
                         success: false,
                         error: `${type === 'logo' ? 'Logo' : type === 'favicon' ? '网站图标' : '微信二维码'}未设置` 
@@ -219,6 +255,33 @@ router.post('/delete-file', requireLogin, async (req, res) => {
                     await fs.access(targetPath);
                     fileExists = true;
                 } catch (err) {
+                    
+                    // 对于微信二维码，尝试查找不同扩展名的文件
+                    if (type === 'wechatQR') {
+                        const extensions = ['.jpg', '.jpeg', '.png', '.gif'];
+                        const baseDir = path.join(__dirname, '..', 'uploads', 'images');
+                        let found = false;
+                        
+                        // 确保目录存在
+                        try {
+                            await fs.mkdir(baseDir, { recursive: true });
+                        } catch (mkdirErr) {
+                            console.error('创建目录失败:', mkdirErr);
+                        }
+                        
+                        for (const ext of extensions) {
+                            const possiblePath = path.join(baseDir, `wechat-qrcode${ext}`);
+                            try {
+                                await fs.access(possiblePath);
+                                targetPath = possiblePath;
+                                fileExists = true;
+                                found = true;
+                                break;
+                            } catch (e) {
+                                // 文件不存在，继续尝试
+                            }
+                        }
+                    }
                 }
                 
                 // 删除文件
@@ -227,8 +290,26 @@ router.post('/delete-file', requireLogin, async (req, res) => {
                         await fs.unlink(targetPath);
                     } catch (err) {
                         console.error('删除文件失败:', err);
-                        // 继续执行，配置已更新
+                        
+                        // 如果是微信二维码，即使删除失败也返回成功（因为配置已更新）
+                        if (type === 'wechatQR') {
+                            return res.json({ 
+                                success: true, 
+                                message: `微信二维码配置已更新，但文件删除失败: ${err.message}` 
+                            });
+                        }
+                        // 如果不是微信二维码，则返回错误
+                        return res.status(500).json({
+                            success: false,
+                            error: `文件删除失败: ${err.message}`
+                        });
                     }
+                } else if (type === 'wechatQR') {
+                    // 如果是微信二维码且文件不存在，仍返回成功（因为配置已更新）
+                    return res.json({ 
+                        success: true, 
+                        message: '微信二维码配置已更新，找不到实际文件' 
+                    });
                 }
                 
                 return res.json({ 

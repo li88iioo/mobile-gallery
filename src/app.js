@@ -51,11 +51,46 @@ app.use((req, res, next) => {
     next();
 });
 
-// 图片外链保护中间件
-app.use((req, res, next) => {
-    // 检查是否是图片请求
-    if (req.path.match(/\.(jpg|jpeg|png|gif|webp|svg|ico)$/i) && req.path.startsWith('/uploads/')) {
-        // 获取referer头
+// 图片外链保护中间件 - 修改为更模块化的结构
+const imageProtectionMiddleware = (() => {
+    // 检查请求是否针对图片资源
+    const isImageRequest = (path) => {
+        return path.match(/\.(jpg|jpeg|png|gif|webp|svg|ico)$/i) && path.startsWith('/uploads/');
+    };
+    
+    // 检查是否是特殊保护的资源
+    const isProtectedResource = (path) => {
+        return path.includes('site-logo') || 
+               path.includes('site-favicon') ||
+               path.includes('wechat-qrcode');
+    };
+    
+    // 验证引用来源是否允许
+    const isAllowedReferer = (referer, host, allowedHosts) => {
+        if (!referer) return false;
+        return allowedHosts.some(allowedHost => referer.includes(allowedHost));
+    };
+    
+    // 设置安全响应头
+    const setSecurityHeaders = (res, isProtected) => {
+        // 基本安全头
+        res.setHeader('X-Frame-Options', 'DENY');
+        res.setHeader('Content-Security-Policy', "img-src 'self'");
+        
+        // 对特殊保护资源禁用缓存
+        if (isProtected) {
+            res.setHeader('Cache-Control', 'no-store, max-age=0');
+        }
+    };
+    
+    // 返回实际中间件函数
+    return (req, res, next) => {
+        // 仅处理图片请求
+        if (!isImageRequest(req.path)) {
+            return next();
+        }
+        
+        // 获取请求信息
         const referer = req.get('referer') || '';
         const host = req.get('host') || '';
         
@@ -67,39 +102,28 @@ app.use((req, res, next) => {
             process.env.ALLOWED_REFERER || ''
         ].filter(Boolean);
         
-        // 检查是否是特殊保护的资源（logo, favicon, 微信二维码）
-        const isProtectedResource = 
-            req.path.includes('site-logo') || 
-            req.path.includes('site-favicon') ||
-            req.path.includes('wechat-qrcode');
+        const protectedResource = isProtectedResource(req.path);
+        const allowedReferer = isAllowedReferer(referer, host, allowedHosts);
         
-        // 确定是否允许访问
-        const isAllowedReferer = allowedHosts.some(allowedHost => 
-            referer.includes(allowedHost)
-        );
-        
-        // 特殊保护资源只能从站内访问，且必须有referer
-        if (isProtectedResource && (!referer || !isAllowedReferer)) {
+        // 特殊保护资源的访问检查
+        if (protectedResource && (!referer || !allowedReferer)) {
             return res.status(403).send('禁止访问受保护资源');
         }
         
-        // 普通图片可以没有referer直接访问，但不能从外部网站引用
-        if (referer && !isAllowedReferer) {
+        // 普通图片的外链检查
+        if (referer && !allowedReferer) {
             return res.status(403).send('禁止外链引用图片');
         }
         
-        // 为响应添加额外保护头
-        res.setHeader('X-Frame-Options', 'DENY'); // 禁止在frame中加载
-        res.setHeader('Content-Security-Policy', "img-src 'self'"); // 只允许从本站加载
+        // 设置必要的安全头
+        setSecurityHeaders(res, protectedResource);
         
-        // 添加"Cache-Control: no-store"以防止缓存
-        if (isProtectedResource) {
-            res.setHeader('Cache-Control', 'no-store, max-age=0');
-        }
-    }
-    
-    next();
-});
+        next();
+    };
+})();
+
+// 使用图片保护中间件
+app.use(imageProtectionMiddleware);
 
 // 添加访问量统计API路由
 app.get('/api/stats/visits', (req, res) => {

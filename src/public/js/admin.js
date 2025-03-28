@@ -2,48 +2,8 @@
  * 后台管理系统 JavaScript
  */
 
-// 常用的DOM元素选择器
-const DOM = {
-    toastContainer: document.getElementById('toastContainer'),
-    // 修改密码相关
-    changePasswordModal: document.getElementById('changePasswordModal'),
-    changePasswordForm: document.getElementById('changePasswordForm'),
-    currentPassword: document.getElementById('currentPassword'),
-    newPassword: document.getElementById('newPassword'),
-    confirmPassword: document.getElementById('confirmPassword'),
-    // 确认操作模态框
-    confirmModal: document.getElementById('confirmModal'),
-    confirmModalMessage: document.getElementById('confirmModalMessage'),
-    confirmModalConfirmBtn: document.getElementById('confirmModalConfirmBtn'),
-    confirmModalCancelBtn: document.getElementById('confirmModalCancelBtn'),
-    // 商品模态框相关
-    productModal: document.getElementById('productModal'),
-    productForm: document.getElementById('productForm'),
-    productModalTitle: document.getElementById('productModalTitle'),
-    productId: document.getElementById('productId'),
-    name: document.getElementById('name'),
-    price: document.getElementById('price'),
-    storage: document.getElementById('storage'),
-    condition: document.getElementById('condition'),
-    repair: document.getElementById('repair'),
-    productImages: document.getElementById('productImages'),
-    imagePreviewContainer: document.getElementById('imagePreviewContainer'),
-    imagePreviewsGrid: document.getElementById('imagePreviewsGrid'),
-    // 用户名显示
-    adminUsername: document.getElementById('adminUsername'),
-    // 分页相关
-    paginationContainer: document.getElementById('paginationContainer'),
-    paginationNumbers: document.getElementById('paginationNumbers'),
-    paginationInfo: document.getElementById('paginationInfo'),
-    paginationCount: document.getElementById('paginationCount'),
-    prevPageBtn: document.getElementById('prevPageBtn'),
-    nextPageBtn: document.getElementById('nextPageBtn'),
-    addProductModal: document.getElementById('addProductModal'),
-    addProductForm: document.getElementById('addProductForm'),
-    addProductModalTitle: document.getElementById('addProductModalTitle'),
-    addProductId: document.getElementById('addProductId'),
-    addProductImages: document.getElementById('addProductImages')
-};
+// 全局DOM对象
+const DOM = {};
 
 // 全局变量存储手机数据
 let phones = [];
@@ -62,6 +22,8 @@ let filteredPhones = [];
  * @param {number} duration - 显示时长(毫秒)
  */
 function showToast(message, type = 'info', duration = 3000) {
+    if (!DOM.toastContainer) return;
+    
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     toast.innerHTML = `<span>${message}</span>`;
@@ -73,7 +35,7 @@ function showToast(message, type = 'info', duration = 3000) {
         toast.classList.add('toast-exiting');
         setTimeout(() => {
             if (toast.parentNode) {
-            toast.remove();
+                toast.remove();
             }
         }, 300);
     }, duration);
@@ -105,9 +67,12 @@ function showToast(message, type = 'info', duration = 3000) {
 function checkLogin() {
     // 发送请求验证登录状态
     fetch('/api/check-auth')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) throw new Error('登录状态检查失败');
+            return response.json();
+        })
         .then(data => {
-        if (!data.isLoggedIn) {
+            if (!data.isLoggedIn) {
                 window.location.href = '/login';
             } else {
                 // 已登录，获取用户名
@@ -126,8 +91,13 @@ function checkLogin() {
  * 获取当前用户名
  */
 function getUsername() {
+    if (!DOM.adminUsername) return;
+    
     fetch('/api/get-username')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) throw new Error('获取用户名失败');
+            return response.json();
+        })
         .then(data => {
             if (data.username) {
                 DOM.adminUsername.textContent = data.username;
@@ -218,51 +188,90 @@ function closeChangePasswordModal() {
  * @param {Event} e - 事件对象
  */
 function handleChangePassword(e) {
-            e.preventDefault();
+    e.preventDefault();
     
+    // 获取并清理密码输入
     const currentPassword = DOM.currentPassword.value.trim();
     const newPassword = DOM.newPassword.value.trim();
     const confirmPassword = DOM.confirmPassword.value.trim();
     
-    // 验证表单
+    // 清除敏感错误消息
+    const genericErrorMsg = '密码修改失败，请检查输入并重试';
+    const networkErrorMsg = '网络连接错误，请稍后重试';
+    
+    // 客户端验证 - 不泄露验证逻辑
     if (!currentPassword || !newPassword || !confirmPassword) {
         showToast('请填写所有密码字段', 'error');
         return;
     }
 
-            if (newPassword !== confirmPassword) {
+    if (newPassword !== confirmPassword) {
         showToast('两次输入的新密码不一致', 'error');
-                return;
-            }
+        return;
+    }
 
-            if (newPassword.length < 6) {
+    if (newPassword.length < 6) {
         showToast('新密码长度不能少于6个字符', 'error');
-                return;
-            }
+        return;
+    }
+    
+    // 显示加载状态
+    const submitBtn = DOM.changePasswordForm.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 提交中...';
 
     // 发送修改密码请求
     fetch('/api/change-password', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
             currentPassword,
             newPassword
-        })
+        }),
+        credentials: 'same-origin' // 确保发送认证凭据
     })
-    .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-            showToast('密码修改成功', 'success');
-                closeChangePasswordModal();
+    .then(response => {
+        // 检查HTTP状态
+        if (!response.ok) {
+            if (response.status === 401) {
+                throw new Error('当前密码错误');
+            } else if (response.status === 429) {
+                throw new Error('请求过于频繁，请稍后再试');
             } else {
-                showToast(data.error || '密码修改失败', 'error');
+                throw new Error(genericErrorMsg);
             }
-        })
-        .catch(error => {
-        console.error('修改密码出错:', error);
-        showToast('修改密码时发生错误', 'error');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            showToast('密码修改成功', 'success');
+            closeChangePasswordModal();
+            
+            // 清除表单数据
+            DOM.changePasswordForm.reset();
+        } else {
+            // 使用通用错误消息，避免泄露详细信息
+            const errorMessage = (data.error === '当前密码错误') 
+                ? '当前密码错误' 
+                : genericErrorMsg;
+            showToast(errorMessage, 'error');
+        }
+    })
+    .catch(error => {
+        // 避免在控制台记录详细错误
+        showToast(
+            error.message === 'Failed to fetch' ? networkErrorMsg : error.message, 
+            'error'
+        );
+    })
+    .finally(() => {
+        // 恢复按钮状态
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnText;
     });
 }
 
@@ -307,12 +316,19 @@ function openAddProductModal() {
  * @param {string} id - 商品ID
  */
 function openEditProductModal(id) {
+    if (!DOM.productModal || !DOM.productModalTitle || !DOM.productId) {
+        showToast('模态框初始化失败，请刷新页面重试', 'error');
+        return;
+    }
+    
     // 设置为编辑模式
     resetProductForm();
     DOM.productModalTitle.textContent = '编辑商品';
     
     // 先隐藏图片预览区域，避免闪烁
-    DOM.imagePreviewContainer.classList.add('hidden');
+    if (DOM.imagePreviewContainer) {
+        DOM.imagePreviewContainer.classList.add('hidden');
+    }
     
     // 确保图片URL输入框的事件绑定正确
     if (DOM.productImages) {
@@ -325,58 +341,81 @@ function openEditProductModal(id) {
     // 获取商品详情并填充表单
     const productId = parseInt(id);
     
-    // 从加载的商品列表中查找
-    fetch('/api/phones')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(phones => {
-            // 查找匹配的商品
-            const product = phones.find(p => p.id == productId);
-            
-            if (product) {
-                // 填充表单字段
-                DOM.productId.value = product.id;
-                DOM.name.value = product.name || '';
-                DOM.price.value = product.price || '';
-                DOM.storage.value = product.storage || '';
-                
-                // 确保下拉菜单成色正确设置
-                setConditionValue(product.condition || '');
-                
-                DOM.repair.value = product.repair || '';
-                
-                // 设置商品图片
-                if (product.mainImageUrl) {
-                    const images = [product.mainImageUrl];
-                    if (product.detailImageUrls && Array.isArray(product.detailImageUrls)) {
-                        images.push(...product.detailImageUrls);
-                    }
-                    
-                    // 设置图片URLs并手动触发预览
-                    DOM.productImages.value = images.filter(url => url).join(',');
-                    previewProductImages({ target: DOM.productImages });
-                } else {
-                    DOM.productImages.value = '';
-                    DOM.imagePreviewContainer.classList.add('hidden');
-                }
-                
-                // 根据设备类型应用不同的样式
-                adjustModalForDevice();
-                
-                // 显示模态框
-                DOM.productModal.classList.add('active');
+    // 尝试从本地数据中查找商品
+    const product = phones.find(p => parseInt(p.id) === productId);
+    
+    if (product) {
+        fillProductForm(product);
     } else {
-                showToast('未找到商品信息', 'error');
+        // 如果本地没有找到，再从API获取
+        fetch('/api/phones')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // 查找匹配的商品
+                const product = Array.isArray(data) ? 
+                    data.find(p => p.id == productId) : null;
+                
+                if (product) {
+                    fillProductForm(product);
+                } else {
+                    showToast('未找到商品信息', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('获取商品信息出错:', error);
+                showToast('获取商品信息失败', 'error');
+            });
+    }
+}
+
+/**
+ * 填充商品表单
+ * @param {Object} product - 商品对象
+ */
+function fillProductForm(product) {
+    if (!product || !DOM.productId) return;
+    
+    // 填充表单字段
+    DOM.productId.value = product.id;
+    
+    if (DOM.name) DOM.name.value = product.name || '';
+    if (DOM.price) DOM.price.value = product.price || '';
+    if (DOM.storage) DOM.storage.value = product.storage || '';
+    
+    // 确保下拉菜单成色正确设置
+    if (DOM.condition) setConditionValue(product.condition || '');
+    
+    if (DOM.repair) DOM.repair.value = product.repair || '';
+    
+    // 设置商品图片
+    if (DOM.productImages) {
+        if (product.mainImageUrl) {
+            const images = [product.mainImageUrl];
+            if (product.detailImageUrls && Array.isArray(product.detailImageUrls)) {
+                images.push(...product.detailImageUrls);
             }
-        })
-        .catch(error => {
-            console.error('获取商品信息出错:', error);
-            showToast('获取商品信息失败', 'error');
-        });
+            
+            // 设置图片URLs并手动触发预览
+            DOM.productImages.value = images.filter(url => url).join(',');
+            previewProductImages({ target: DOM.productImages });
+        } else {
+            DOM.productImages.value = '';
+            if (DOM.imagePreviewContainer) {
+                DOM.imagePreviewContainer.classList.add('hidden');
+            }
+        }
+    }
+    
+    // 根据设备类型应用不同的样式
+    adjustModalForDevice();
+    
+    // 显示模态框
+    DOM.productModal.classList.add('active');
 }
 
 /**
@@ -562,8 +601,8 @@ function handleProductFormSubmit(e) {
                     todayVisits: document.getElementById('todayVisits').textContent || 0
                 });
                 
-                // 同时刷新侧边栏和月销量等其他统计数据
-                loadProductStats();
+                // 使用已有的phones数据更新统计
+                updateProductStats(phones);
             }
         });
     } catch (error) {
@@ -601,6 +640,9 @@ function loadProducts() {
                     soldProducts: soldCount,
                     todayVisits: document.getElementById('todayVisits').textContent || 0
                 });
+                
+                // 使用已加载的phones数据更新其他统计信息
+                updateProductStats(phones);
             } else {
                 showToast('获取商品列表失败', 'error');
                 document.getElementById('productsTableBody').innerHTML = '<tr><td colspan="8" class="text-center py-4">加载失败</td></tr>';
@@ -610,6 +652,58 @@ function loadProducts() {
             showToast('获取商品列表时发生错误', 'error');
             document.getElementById('productsTableBody').innerHTML = '<tr><td colspan="8" class="text-center py-4">加载失败</td></tr>';
         });
+}
+
+/**
+ * 更新商品统计数据，使用已加载的phones数据
+ * @param {Array} phones - 商品数据数组
+ */
+function updateProductStats(phones) {
+    // 统计在售与已售商品
+    const soldCount = phones.filter(phone => phone.soldOut === true).length;
+    const totalCount = phones.length;
+    const availableCount = totalCount - soldCount;
+    
+    // 更新在售商品数量
+    const totalProducts = document.getElementById('totalProducts');
+    if (totalProducts) {
+        totalProducts.textContent = availableCount.toLocaleString();
+    }
+    
+    // 更新已售商品数量
+    const soldProducts = document.getElementById('soldProducts');
+    if (soldProducts) {
+        soldProducts.textContent = soldCount.toLocaleString();
+    }
+    
+    // 计算本月销量
+    const monthlySales = document.getElementById('monthlySales');
+    if (monthlySales) {
+        const now = new Date();
+        const thisMonth = now.getMonth();
+        const thisYear = now.getFullYear();
+        
+        const monthlySoldCount = phones.filter(phone => {
+            if (!phone.soldOut || !phone.soldDate) return false;
+            const soldDate = new Date(phone.soldDate);
+            return soldDate.getMonth() === thisMonth && 
+                   soldDate.getFullYear() === thisYear;
+        }).length;
+        
+        monthlySales.textContent = monthlySoldCount.toLocaleString();
+    }
+    
+    // 计算平均价格
+    const averagePrice = document.getElementById('averagePrice');
+    if (averagePrice) {
+        if (phones.length > 0) {
+            const totalPrice = phones.reduce((sum, phone) => sum + (parseFloat(phone.price) || 0), 0);
+            const avgPrice = totalPrice / phones.length;
+            averagePrice.textContent = '¥' + avgPrice.toFixed(2).toLocaleString();
+        } else {
+            averagePrice.textContent = '¥0';
+        }
+    }
 }
 
 /**
@@ -819,8 +913,8 @@ function deleteProduct(id) {
                     todayVisits: document.getElementById('todayVisits').textContent || 0
                 });
                 
-                // 同时刷新侧边栏和月销量等其他统计数据
-                loadProductStats();
+                // 使用已有的phones数据更新统计
+                updateProductStats(phones);
             }
         } catch (error) {
             console.error('删除商品出错:', error);
@@ -833,17 +927,20 @@ function deleteProduct(id) {
  * 初始化DOM元素引用
  */
 function initializeDOMElements() {
-    // 更新DOM对象以包含所有必要ID
+    // 常用的DOM元素选择器
     DOM.toastContainer = document.getElementById('toastContainer');
+    // 修改密码相关
     DOM.changePasswordModal = document.getElementById('changePasswordModal');
     DOM.changePasswordForm = document.getElementById('changePasswordForm');
     DOM.currentPassword = document.getElementById('currentPassword');
     DOM.newPassword = document.getElementById('newPassword');
     DOM.confirmPassword = document.getElementById('confirmPassword');
+    // 确认操作模态框
     DOM.confirmModal = document.getElementById('confirmModal');
     DOM.confirmModalMessage = document.getElementById('confirmModalMessage');
     DOM.confirmModalConfirmBtn = document.getElementById('confirmModalConfirmBtn');
     DOM.confirmModalCancelBtn = document.getElementById('confirmModalCancelBtn');
+    // 商品模态框相关
     DOM.productModal = document.getElementById('productModal');
     DOM.productForm = document.getElementById('productForm');
     DOM.productModalTitle = document.getElementById('productModalTitle');
@@ -880,101 +977,108 @@ function initializeDOMElements() {
  * 设置事件监听器
  */
 function setupEventListeners() {
-    // 检查登录状态
-    checkLogin();
-    
-    // 加载商品和统计数据
-    loadProducts();
-    loadStats();
-    
-    // 初始化DOM元素引用
-    initializeDOMElements();
-    
-    // 设置事件监听器
-    if (DOM.changePasswordForm) {
-        DOM.changePasswordForm.addEventListener('submit', handleChangePassword);
-    }
-    
-    if (DOM.productForm) {
-        DOM.productForm.addEventListener('submit', handleProductFormSubmit);
-    }
-    
-    // 设置添加商品模态框的事件监听器
-    if (DOM.addProductForm) {
-        DOM.addProductForm.addEventListener('submit', handleProductFormSubmit);
-    }
-    
-    // 图片输入事件
-    if (DOM.productImages) {
-        DOM.productImages.addEventListener('input', previewProductImages);
-        DOM.productImages.addEventListener('paste', handleImagePaste);
-    }
-    
-    if (DOM.addProductImages) {
-        DOM.addProductImages.addEventListener('input', previewProductImages);
-        DOM.addProductImages.addEventListener('paste', handleImagePaste);
-    }
-    
-    // 为搜索框添加事件监听器
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.addEventListener('input', () => {
-            currentPage = 1; // 搜索时重置到第1页
-            debounce(handleSearch, 300)();
-        });
+    try {
+        // 检查登录状态
+        checkLogin();
         
-        // 确保搜索图标不会干扰搜索框使用
-        const searchIcon = searchInput.parentElement.querySelector('i');
-        if (searchIcon) {
-            searchIcon.addEventListener('click', () => {
-                searchInput.focus(); // 点击图标时让搜索框获得焦点
+        // 加载商品和统计数据
+        loadProducts();
+        loadStats();
+        
+        // 设置事件监听器，包含空检查，防止DOM不存在时报错
+        if (DOM.changePasswordForm) {
+            DOM.changePasswordForm.addEventListener('submit', handleChangePassword);
+        }
+        
+        if (DOM.productForm) {
+            DOM.productForm.addEventListener('submit', handleProductFormSubmit);
+        }
+        
+        // 设置添加商品模态框的事件监听器
+        if (DOM.addProductForm) {
+            DOM.addProductForm.addEventListener('submit', handleProductFormSubmit);
+        }
+        
+        // 图片输入事件
+        if (DOM.productImages) {
+            DOM.productImages.addEventListener('input', previewProductImages);
+            DOM.productImages.addEventListener('paste', handleImagePaste);
+        }
+        
+        if (DOM.addProductImages) {
+            DOM.addProductImages.addEventListener('input', previewProductImages);
+            DOM.addProductImages.addEventListener('paste', handleImagePaste);
+        }
+        
+        // 为搜索框添加事件监听器
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            // 使用防抖函数优化搜索输入
+            const debouncedSearch = debounce(() => {
+                currentPage = 1; // 搜索时重置到第1页
+                handleSearch();
+            }, 300);
+            
+            searchInput.addEventListener('input', debouncedSearch);
+            
+            // 确保搜索图标不会干扰搜索框使用
+            const searchIcon = searchInput.parentElement?.querySelector('i');
+            if (searchIcon) {
+                searchIcon.addEventListener('click', () => {
+                    searchInput.focus(); // 点击图标时让搜索框获得焦点
+                });
+            }
+        }
+        
+        // 为排序下拉菜单添加事件监听器
+        const sortField = document.getElementById('sortField');
+        if (sortField) {
+            sortField.addEventListener('change', () => {
+                currentPage = 1; // 排序时重置到第1页
+                handleSearch();
             });
         }
-    }
-    
-    // 为排序下拉菜单添加事件监听器
-    const sortField = document.getElementById('sortField');
-    if (sortField) {
-        sortField.addEventListener('change', () => {
-            currentPage = 1; // 排序时重置到第1页
-            handleSearch();
-        });
-    }
-    
-    // 为排序方向按钮添加事件监听器
-    const sortDirection = document.getElementById('sortDirection');
-    if (sortDirection) {
-        sortDirection.addEventListener('click', () => {
-            currentPage = 1; // 排序方向改变时重置到第1页
-            toggleSortDirection();
-        });
-    }
-    
-    // 窗口大小变化时重新调整模态框样式
-    window.addEventListener('resize', debounce(function() {
-        // 只有当模态框打开时才调整
-        if (DOM.productModal && DOM.productModal.classList.contains('active')) {
-            adjustModalForDevice();
+        
+        // 为排序方向按钮添加事件监听器
+        const sortDirection = document.getElementById('sortDirection');
+        if (sortDirection) {
+            sortDirection.addEventListener('click', () => {
+                currentPage = 1; // 排序方向改变时重置到第1页
+                toggleSortDirection();
+            });
         }
-    }, 200));
-    
-    // 初始化模态框的点击外部关闭
-    initModalOutsideClickHandlers();
-    
-    // 加载当前网站设置
-    loadSiteSettings();
-    
-    // 确认模态框取消按钮
-    if (DOM.confirmModalCancelBtn) {
-        DOM.confirmModalCancelBtn.addEventListener('click', closeConfirmModal);
-    }
-    
-    // 分页按钮事件
-    if (DOM.prevPageBtn) {
-        DOM.prevPageBtn.addEventListener('click', prevPage);
-    }
-    if (DOM.nextPageBtn) {
-        DOM.nextPageBtn.addEventListener('click', nextPage);
+        
+        // 窗口大小变化时重新调整模态框样式
+        const handleResize = debounce(() => {
+            // 只有当模态框打开时才调整
+            if (DOM.productModal?.classList.contains('active')) {
+                adjustModalForDevice();
+            }
+        }, 200);
+        
+        window.addEventListener('resize', handleResize);
+        
+        // 初始化模态框的点击外部关闭
+        initModalOutsideClickHandlers();
+        
+        // 加载当前网站设置
+        loadSiteSettings();
+        
+        // 确认模态框取消按钮
+        if (DOM.confirmModalCancelBtn) {
+            DOM.confirmModalCancelBtn.addEventListener('click', closeConfirmModal);
+        }
+        
+        // 分页按钮事件
+        if (DOM.prevPageBtn) {
+            DOM.prevPageBtn.addEventListener('click', prevPage);
+        }
+        if (DOM.nextPageBtn) {
+            DOM.nextPageBtn.addEventListener('click', nextPage);
+        }
+    } catch (error) {
+        console.error('设置事件监听器失败:', error);
+        showToast('初始化界面失败，请刷新页面重试', 'error', 5000);
     }
 }
 
@@ -984,12 +1088,30 @@ function setupEventListeners() {
  * @param {number} wait - 等待时间(毫秒)
  * @returns {Function} - 防抖处理后的函数
  */
-function debounce(func, wait) {
+function debounce(func, wait = 300) {
     let timeout;
     return function(...args) {
         const context = this;
         clearTimeout(timeout);
         timeout = setTimeout(() => func.apply(context, args), wait);
+    };
+}
+
+/**
+ * 节流函数
+ * @param {Function} func - 需要节流的函数
+ * @param {number} limit - 限制时间(毫秒)
+ * @returns {Function} - 节流处理后的函数
+ */
+function throttle(func, limit = 300) {
+    let inThrottle;
+    return function(...args) {
+        const context = this;
+        if (!inThrottle) {
+            func.apply(context, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
     };
 }
 
@@ -1151,8 +1273,13 @@ function updateWechatQRPreview(url) {
     wechatPreview.classList.remove('hidden');
     
     if (url) {
-        // 有微信二维码
-        wechatPreviewImg.src = url;
+        // 有微信二维码 - 添加时间戳参数防止缓存
+        const timestamp = new Date().getTime();
+        // 如果是数据URL或已有时间戳参数则不添加
+        const finalUrl = url.startsWith('data:') || url.includes('t=') ? url : 
+            (url.includes('?') ? `${url}&t=${timestamp}` : `${url}?t=${timestamp}`);
+        
+        wechatPreviewImg.src = finalUrl;
         wechatPreviewImg.classList.remove('hidden');
         wechatEmptyText.classList.add('hidden');
         
@@ -1309,7 +1436,13 @@ function updateLogoPreview(url) {
     const logoEmptyText = document.getElementById('logoEmptyText');
     const logoDeleteButton = document.getElementById('logoDeleteButton');
         
-        if (url) {
+    if (url) {
+        // 如果是来自服务器的URL（不是data:URL），添加时间戳防止缓存
+        if (url.startsWith('http') || url.startsWith('/')) {
+            const timestamp = new Date().getTime();
+            url = url.includes('?') ? `${url}&t=${timestamp}` : `${url}?t=${timestamp}`;
+        }
+        
         logoPreviewImg.src = url;
         logoPreviewImg.classList.remove('hidden');
         logoEmptyText.classList.add('hidden');
@@ -1348,6 +1481,12 @@ function updateFaviconPreview(url) {
     const faviconDeleteButton = document.getElementById('faviconDeleteButton');
     
     if (url) {
+        // 如果是来自服务器的URL（不是data:URL），添加时间戳防止缓存
+        if (url.startsWith('http') || url.startsWith('/')) {
+            const timestamp = new Date().getTime();
+            url = url.includes('?') ? `${url}&t=${timestamp}` : `${url}?t=${timestamp}`;
+        }
+        
         faviconPreviewImg.src = url;
         faviconPreviewImg.classList.remove('hidden');
         faviconEmptyText.classList.add('hidden');
@@ -1671,88 +1810,64 @@ function loadStats() {
  * 加载商品统计数据
  */
 function loadProductStats() {
-    fetch('/api/phones?limit=999')
-        .then(response => response.json())
-        .then(data => {
-            let phones = Array.isArray(data) ? data : (data.phones || []);
-            
-            // 统计在售与已售商品
-            const soldCount = phones.filter(phone => phone.soldOut === true).length;
-            const totalCount = phones.length;
-            const availableCount = totalCount - soldCount;
-            
-            // 更新在售商品数量
-            const totalProducts = document.getElementById('totalProducts');
-            if (totalProducts) {
-                totalProducts.textContent = availableCount.toLocaleString();
-            }
-            
-            // 更新已售商品数量
-            const soldProducts = document.getElementById('soldProducts');
-            if (soldProducts) {
-                soldProducts.textContent = soldCount.toLocaleString();
-            }
-            
-            // 计算本月销量
-            const monthlySales = document.getElementById('monthlySales');
-            if (monthlySales) {
-                const now = new Date();
-                const thisMonth = now.getMonth();
-                const thisYear = now.getFullYear();
-                
-                const monthlySoldCount = phones.filter(phone => {
-                    if (!phone.soldOut || !phone.soldDate) return false;
-                    const soldDate = new Date(phone.soldDate);
-                    return soldDate.getMonth() === thisMonth && 
-                           soldDate.getFullYear() === thisYear;
-                }).length;
-                
-                monthlySales.textContent = monthlySoldCount.toLocaleString();
-            }
-            
-            // 计算平均价格
-            const averagePrice = document.getElementById('averagePrice');
-            if (averagePrice) {
-                if (phones.length > 0) {
-                    const totalPrice = phones.reduce((sum, phone) => sum + (parseFloat(phone.price) || 0), 0);
-                    const avgPrice = totalPrice / phones.length;
-                    averagePrice.textContent = '¥' + avgPrice.toFixed(2).toLocaleString();
-        } else {
-                    averagePrice.textContent = '¥0';
-                }
-            }
-        })
-        .catch(error => {
-            console.error('获取商品统计出错:', error);
-        });
+    // 如果已经有phones数据，直接使用
+    if (phones && phones.length > 0) {
+        updateProductStats(phones);
+    } else {
+        // 如果没有数据，才发送请求获取
+        fetch('/api/phones?limit=999')
+            .then(response => response.json())
+            .then(data => {
+                let loadedPhones = Array.isArray(data) ? data : (data.phones || []);
+                updateProductStats(loadedPhones);
+            })
+            .catch(error => {
+                console.error('获取商品统计出错:', error);
+            });
+    }
 }
 
 /**
  * 初始化模态框外部点击事件
  */
 function initModalOutsideClickHandlers() {
-    // 获取所有模态框
-    const modals = document.querySelectorAll('.modal');
-    
-    // 为每个模态框添加点击事件
-    modals.forEach(modal => {
-        modal.addEventListener('click', function(event) {
-            // 如果点击的是模态框本身（不是模态框内容区域）
-            if (event.target === modal) {
-                // 获取模态框ID来确定关闭哪个模态框
-                const modalId = modal.id;
-                if (modalId === 'settingsModal') {
-                    closeSettingsModal();
-                } else if (modalId === 'productModal' || modalId === 'addProductModal') {
-                    closeProductModal();
-                } else if (modalId === 'changePasswordModal') {
-                    closeChangePasswordModal();
-                } else if (modalId === 'confirmModal') {
-                    closeConfirmModal();
-                }
-            }
+    try {
+        // 获取所有模态框
+        const modals = document.querySelectorAll('.modal');
+        
+        // 为每个模态框添加点击事件
+        modals.forEach(modal => {
+            // 先移除已有的监听器（如果有的话）
+            modal.removeEventListener('click', handleModalClick);
+            // 添加新监听器
+            modal.addEventListener('click', handleModalClick);
         });
-    });
+    } catch (error) {
+        console.error('初始化模态框点击事件失败:', error);
+    }
+}
+
+/**
+ * 处理模态框点击事件
+ * @param {Event} event - 点击事件
+ */
+function handleModalClick(event) {
+    // 如果点击的是模态框本身（不是模态框内容区域）
+    if (event.target === this) {
+        // 获取模态框ID来确定关闭哪个模态框
+        const modalId = this.id;
+        if (modalId === 'settingsModal') {
+            closeSettingsModal();
+        } else if (modalId === 'productModal' || modalId === 'addProductModal') {
+            closeProductModal();
+        } else if (modalId === 'changePasswordModal') {
+            closeChangePasswordModal();
+        } else if (modalId === 'confirmModal') {
+            closeConfirmModal();
+        } else if (modalId === 'contactModal') {
+            closeContactModal();
+        }
+    }
 }
 
 /**
@@ -1862,8 +1977,8 @@ function markAsSold(id) {
                     todayVisits: document.getElementById('todayVisits').textContent || 0
                 });
                 
-                // 同时刷新侧边栏和月销量等其他统计数据
-                loadProductStats();
+                // 使用已有的phones数据更新统计
+                updateProductStats(phones);
             }
         } catch (error) {
             showToast("操作失败，请重试", 'error');
@@ -1873,83 +1988,187 @@ function markAsSold(id) {
 
 /**
  * 预览产品图片
+ * @param {Event} event - 输入事件 
  */
 function previewProductImages(event) {
+    if (!DOM.imagePreviewContainer || !DOM.imagePreviewsGrid || !event.target) {
+        return;
+    }
+    
     // 获取图片URL文本
     const urlsText = event.target.value;
     
     // 如果没有URL，隐藏预览区域
-    if (!urlsText.trim()) {
+    if (!urlsText || !urlsText.trim()) {
         DOM.imagePreviewContainer.classList.add('hidden');
         return;
     }
     
-    // 分割并清理URL
-    const urls = urlsText.split(',')
-        .map(url => url.trim())
-        .filter(url => url && (url.startsWith('http') || url.startsWith('/')));
-    
-    // 如果没有有效URL，隐藏预览区域
-    if (urls.length === 0) {
-        DOM.imagePreviewContainer.classList.add('hidden');
-        return;
-    }
-    
-    // 清空预览区域
-    DOM.imagePreviewsGrid.innerHTML = '';
-    
-    // 根据图片数量调整模态框宽度和网格列数
-    const imageCount = urls.length;
-    const baseWidth = 600; // 基础宽度
-    let additionalWidth = 0;
-    
-    // 计算额外宽度
-    if (imageCount > 4) {
-        // 每多4张图片，额外增加200px宽度，最大1000px
-        additionalWidth = Math.min(300, Math.floor((imageCount - 1) / 4) * 100);
-    }
-    
-    // 应用到模态框
-    const modalContent = DOM.productModal.querySelector('.modal-content');
-    if (modalContent) {
-        modalContent.style.width = `${baseWidth + additionalWidth}px`;
-        modalContent.style.maxWidth = `${baseWidth + additionalWidth}px`;
-    }
-    
-    // 预览各个图片
-    urls.forEach(url => {
-        const imgContainer = document.createElement('div');
-        imgContainer.className = 'relative bg-gray-100 border border-gray-200 rounded-lg overflow-hidden';
-        imgContainer.style.aspectRatio = '1 / 1';
+    try {
+        // 分割并清理URL，增加安全验证
+        const urls = urlsText.split(',')
+            .map(url => url.trim())
+            .filter(url => url && (url.startsWith('http') || url.startsWith('/')));
         
-        const img = document.createElement('img');
-        img.className = 'w-full h-full object-cover';
-        img.alt = 'Product Image';
-        img.src = url;
+        // 如果没有有效URL，隐藏预览区域
+        if (urls.length === 0) {
+            DOM.imagePreviewContainer.classList.add('hidden');
+            return;
+        }
         
-        // 处理图片加载失败
-        img.onerror = () => {
-            img.src = '/images/no-image.png';
-            img.classList.add('object-contain', 'p-2');
-        };
+        // 清空预览区域
+        DOM.imagePreviewsGrid.innerHTML = '';
         
-        // 处理图片加载成功
-        img.onload = () => {
-            if (img.naturalWidth < img.naturalHeight) {
-                img.classList.add('object-contain', 'p-1');
+        // 根据图片数量调整模态框宽度和网格列数
+        const imageCount = urls.length;
+        const baseWidth = 600; // 基础宽度
+        let additionalWidth = 0;
+        
+        // 计算额外宽度
+        if (imageCount > 4) {
+            // 每多4张图片，额外增加200px宽度，最大1000px
+            additionalWidth = Math.min(300, Math.floor((imageCount - 1) / 4) * 100);
+        }
+        
+        // 应用到模态框
+        const modalContent = DOM.productModal?.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.style.width = `${baseWidth + additionalWidth}px`;
+            modalContent.style.maxWidth = `${baseWidth + additionalWidth}px`;
+        }
+        
+        // 预览各个图片
+        urls.forEach(url => {
+            const imgContainer = document.createElement('div');
+            imgContainer.className = 'relative bg-gray-100 border border-gray-200 rounded-lg overflow-hidden';
+            imgContainer.style.aspectRatio = '1 / 1';
+            
+            const img = document.createElement('img');
+            img.className = 'w-full h-full object-cover';
+            img.alt = 'Product Image';
+            img.loading = 'lazy'; // 添加懒加载
+            
+            // 安全处理图片URL
+            if (url.startsWith('http') || url.startsWith('/')) {
+                img.src = url;
+            } else {
+                img.src = '/' + url;
             }
-        };
+            
+            // 处理图片加载失败
+            img.onerror = () => {
+                img.src = '/images/no-image.png';
+                img.classList.add('object-contain', 'p-2');
+            };
+            
+            // 处理图片加载成功
+            img.onload = () => {
+                if (img.naturalWidth < img.naturalHeight) {
+                    img.classList.add('object-contain', 'p-1');
+                }
+            };
+            
+            imgContainer.appendChild(img);
+            DOM.imagePreviewsGrid.appendChild(imgContainer);
+        });
         
-        imgContainer.appendChild(img);
-        DOM.imagePreviewsGrid.appendChild(imgContainer);
-    });
+        // 根据图片数量调整网格列数
+        const columns = Math.min(4, Math.max(2, Math.min(urls.length, 4)));
+        DOM.imagePreviewsGrid.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+        
+        // 显示预览区域
+        DOM.imagePreviewContainer.classList.remove('hidden');
+    } catch (error) {
+        console.error('预览图片出错:', error);
+        DOM.imagePreviewContainer.classList.add('hidden');
+    }
+}
+
+/**
+ * 处理图片粘贴事件
+ * @param {Event} e - 粘贴事件
+ */
+function handleImagePaste(e) {
+    if (!DOM.productImages) return;
     
-    // 根据图片数量调整网格列数
-    const columns = Math.min(4, Math.max(2, Math.min(urls.length, 4)));
-    DOM.imagePreviewsGrid.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+    // 使用防抖避免频繁触发
+    setTimeout(() => {
+        previewProductImages({ target: DOM.productImages });
+    }, 100);
+}
+
+/**
+ * 更新Logo状态
+ * @param {string} logoUrl - Logo的URL
+ */
+function updateLogoStatus(logoUrl) {
+    const logoStatusText = document.getElementById('logoStatusText');
+    if (!logoStatusText) return;
     
-    // 显示预览区域
-    DOM.imagePreviewContainer.classList.remove('hidden');
+    if (logoUrl) {
+        logoStatusText.textContent = '已设置';
+        logoStatusText.className = 'text-green-500';
+    } else {
+        logoStatusText.textContent = '未设置';
+        logoStatusText.className = 'text-gray-500';
+    }
+}
+
+/**
+ * 更新Favicon状态
+ * @param {string} faviconUrl - Favicon的URL
+ */
+function updateFaviconStatus(faviconUrl) {
+    const faviconStatusText = document.getElementById('faviconStatusText');
+    const favicon = document.getElementById('favicon');
+    
+    if (faviconUrl && favicon) {
+        // 添加时间戳防止缓存
+        if (faviconUrl.startsWith('http') || faviconUrl.startsWith('/')) {
+            const timestamp = new Date().getTime();
+            const finalUrl = faviconUrl.includes('?') ? 
+                `${faviconUrl}&t=${timestamp}` : 
+                `${faviconUrl}?t=${timestamp}`;
+            favicon.href = finalUrl;
+        } else {
+            favicon.href = faviconUrl;
+        }
+    }
+    
+    if (!faviconStatusText) return;
+    
+    if (faviconUrl) {
+        faviconStatusText.textContent = '已设置';
+        faviconStatusText.className = 'text-green-500';
+    } else {
+        faviconStatusText.textContent = '未设置';
+        faviconStatusText.className = 'text-gray-500';
+    }
+}
+
+/**
+ * 更新设置状态
+ * @param {Object} data - 设置数据
+ */
+function updateSettingsStatus(data) {
+    const settingsStatus = document.getElementById('settingsStatus');
+    if (!settingsStatus) return;
+    
+    // 检查所有必要的设置是否都已配置
+    const hasTitle = !!data.title;
+    const hasLogo = !!data.logo;
+    const hasFavicon = !!data.favicon;
+    
+    if (hasTitle && hasLogo && hasFavicon) {
+        settingsStatus.textContent = '已完成';
+        settingsStatus.className = 'text-sm font-medium text-green-500 text-right ml-2';
+    } else if (!hasTitle && !hasLogo && !hasFavicon) {
+        settingsStatus.textContent = '未配置';
+        settingsStatus.className = 'text-sm font-medium text-red-500 text-right ml-2';
+    } else {
+        settingsStatus.textContent = '部分配置';
+        settingsStatus.className = 'text-sm font-medium text-yellow-500 text-right ml-2';
+    }
 }
 
 /**
@@ -2053,11 +2272,24 @@ function nextPage() {
 
 // 初始化函数 - 在页面加载完成后调用
 document.addEventListener('DOMContentLoaded', function() {
-    // 初始化事件监听器
-    setupEventListeners();
-    
-    // 加载产品统计
-    loadProductStats();
+    try {
+        // 初始化DOM元素引用 - 在DOM加载后再初始化引用
+        initializeDOMElements();
+        
+        // 初始化事件监听器
+        setupEventListeners();
+    } catch (error) {
+        console.error('初始化失败:', error);
+        // 即使DOM引用失败也尝试显示错误
+        const toastContainer = document.getElementById('toastContainer');
+        if (toastContainer) {
+            const toast = document.createElement('div');
+            toast.className = 'toast toast-error';
+            toast.innerHTML = `<span>初始化失败: ${error.message}</span>`;
+            toastContainer.appendChild(toast);
+            setTimeout(() => toast.remove(), 5000);
+        }
+    }
 });
 
 /**
@@ -2177,77 +2409,3 @@ function submitProductForm() {
     DOM.productForm.dispatchEvent(submitEvent);
 }
 
-/**
- * 处理图片粘贴事件
- * @param {Event} e - 粘贴事件
- */
-function handleImagePaste(e) {
-    setTimeout(() => {
-        previewProductImages({ target: DOM.productImages });
-    }, 100);
-}
-
-/**
- * 更新Logo状态
- * @param {string} logoUrl - Logo的URL
- */
-function updateLogoStatus(logoUrl) {
-    const logoStatusText = document.getElementById('logoStatusText');
-    if (!logoStatusText) return;
-    
-    if (logoUrl) {
-        logoStatusText.textContent = '已设置';
-        logoStatusText.className = 'text-green-500';
-    } else {
-        logoStatusText.textContent = '未设置';
-        logoStatusText.className = 'text-gray-500';
-    }
-}
-
-/**
- * 更新Favicon状态
- * @param {string} faviconUrl - Favicon的URL
- */
-function updateFaviconStatus(faviconUrl) {
-    const faviconStatusText = document.getElementById('faviconStatusText');
-    const favicon = document.getElementById('favicon');
-    
-    if (faviconUrl && favicon) {
-        favicon.href = faviconUrl;
-    }
-    
-    if (!faviconStatusText) return;
-    
-    if (faviconUrl) {
-        faviconStatusText.textContent = '已设置';
-        faviconStatusText.className = 'text-green-500';
-    } else {
-        faviconStatusText.textContent = '未设置';
-        faviconStatusText.className = 'text-gray-500';
-    }
-}
-
-/**
- * 更新设置状态
- * @param {Object} data - 设置数据
- */
-function updateSettingsStatus(data) {
-    const settingsStatus = document.getElementById('settingsStatus');
-    if (!settingsStatus) return;
-    
-    // 检查所有必要的设置是否都已配置
-    const hasTitle = !!data.title;
-    const hasLogo = !!data.logo;
-    const hasFavicon = !!data.favicon;
-    
-    if (hasTitle && hasLogo && hasFavicon) {
-        settingsStatus.textContent = '已完成';
-        settingsStatus.className = 'text-sm font-medium text-green-500 text-right ml-2';
-    } else if (!hasTitle && !hasLogo && !hasFavicon) {
-        settingsStatus.textContent = '未配置';
-        settingsStatus.className = 'text-sm font-medium text-red-500 text-right ml-2';
-    } else {
-        settingsStatus.textContent = '部分配置';
-        settingsStatus.className = 'text-sm font-medium text-yellow-500 text-right ml-2';
-    }
-}

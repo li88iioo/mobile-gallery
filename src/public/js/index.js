@@ -89,45 +89,91 @@ const ImageCache = {
     preloadBatch(urls) {
         if (!urls || !urls.length) return;
         
-        // 过滤已缓存的图片
-        const toPreload = urls.filter(url => url && !this.has(url));
+        // 过滤已缓存的图片和无效URLs
+        const toPreload = urls.filter(url => url && typeof url === 'string' && !this.has(url));
+        if (toPreload.length === 0) return;
         
-        // 添加到预加载队列
-        toPreload.forEach(url => {
-            this._preloadQueue.push({url, resolve: () => {}});
+        // 限制预加载数量，避免过多请求
+        const maxBatchSize = 5;
+        const batchToLoad = toPreload.slice(0, maxBatchSize);
+        
+        // 添加优先级属性，第一张图片优先级最高
+        batchToLoad.forEach((url, index) => {
+            this._preloadQueue.push({
+                url, 
+                resolve: () => {}, 
+                priority: index === 0 ? 2 : 1 // 第一张图片优先级更高
+            });
         });
         
+        // 开始处理队列
         this._processQueue();
     },
     
     // 处理预加载队列
     _processQueue() {
+        // 如果已经在预加载或队列为空，则返回
         if (this._isPreloading || this._preloadQueue.length === 0) return;
+        
+        // 按优先级排序队列
+        this._preloadQueue.sort((a, b) => b.priority - a.priority);
         
         this._isPreloading = true;
         const {url, resolve} = this._preloadQueue.shift();
         
-        const img = new Image();
-        img.onload = () => {
-            this.add(url, img);
-            resolve();
-            this._isPreloading = false;
-            this._processQueue();
-        };
-        img.onerror = () => {
-            resolve();
-            this._isPreloading = false;
-            this._processQueue();
-        };
-        
-        // 添加时间戳或缓存破坏参数以防止浏览器缓存，仅针对无缓存控制的URL
-        if (url.startsWith('http') && !url.includes('cache=')) {
-            img.src = url + (url.includes('?') ? '&' : '?') + 'cache=1';
-        } else {
-            img.src = url;
-        }
+        // 使用requestAnimationFrame避免阻塞UI
+        requestAnimationFrame(() => {
+            const img = new Image();
+            
+            // 设置加载超时，避免无限等待
+            const timeout = setTimeout(() => {
+                img.onload = img.onerror = null;
+                console.warn(`Image load timeout: ${url}`);
+                this._isPreloading = false;
+                this._processQueue();
+                resolve(null);
+            }, 10000); // 10秒超时
+            
+            img.onload = () => {
+                clearTimeout(timeout);
+                this.add(url, img);
+                resolve(img);
+                this._isPreloading = false;
+                
+                // 使用setTimeout避免长时间阻塞主线程
+                setTimeout(() => this._processQueue(), 50);
+            };
+            
+            img.onerror = () => {
+                clearTimeout(timeout);
+                console.warn(`Failed to load image: ${url}`);
+                resolve(null);
+                this._isPreloading = false;
+                
+                // 出错后继续加载队列中的其他图片
+                setTimeout(() => this._processQueue(), 50);
+            };
+            
+            // 添加缓存破坏参数
+            if (url.startsWith('http') && !url.includes('cache=')) {
+                const cacheBuster = `cache=${Date.now()}`;
+                img.src = url + (url.includes('?') ? '&' : '?') + cacheBuster;
+            } else {
+                img.src = url;
+            }
+        });
     }
 };
+
+// 添加全局设置缓存
+let cachedSettings = null;
+let lastSettingsUpdate = 0;
+const SETTINGS_CACHE_TIME = 60000; // 1分钟缓存时间
+
+// 添加last-edit-time缓存
+let cachedLastEditTime = null;
+let lastEditTimeCheckTimestamp = 0;
+const LAST_EDIT_TIME_CACHE_TIME = 15000; // 15秒缓存时间
 
 // ===== 数据获取函数 =====
 
@@ -209,12 +255,24 @@ async function getPhones(page = 1, limit = itemsPerPage, sortBy = currentSortBy,
  */
 async function getLastEditTime() {
     try {
+        // 检查缓存是否过期
+        const now = Date.now();
+        if (cachedLastEditTime && (now - lastEditTimeCheckTimestamp < LAST_EDIT_TIME_CACHE_TIME)) {
+            return cachedLastEditTime;
+        }
+        
         const response = await fetch('/api/last-edit-time');
         if (!response.ok) {
             throw new Error(`API请求失败: ${response.status}`);
         }
         const data = await response.json();
-        return data.timestamp || data.lastEditTime || null;
+        const timestamp = data.timestamp || data.lastEditTime || null;
+        
+        // 更新缓存
+        cachedLastEditTime = timestamp;
+        lastEditTimeCheckTimestamp = now;
+        
+        return timestamp;
     } catch (error) {
         console.error('获取最后编辑时间失败:', error);
         return null;
@@ -244,6 +302,12 @@ async function getVisitStats() {
  */
 async function loadSiteSettings() {
     try {
+        // 如果有缓存且缓存时间未过期，直接使用缓存
+        const now = Date.now();
+        if (cachedSettings && (now - lastSettingsUpdate < SETTINGS_CACHE_TIME)) {
+            return cachedSettings;
+        }
+        
         const response = await fetch('/api/settings', {
             credentials: 'include',
             headers: {
@@ -267,7 +331,7 @@ async function loadSiteSettings() {
         }
         
         // 确保settings属性有默认值
-        return {
+        settings = {
             title: settings.title || '二手机展示',
             logo: settings.logo || '',
             favicon: settings.favicon || '',
@@ -277,6 +341,12 @@ async function loadSiteSettings() {
                 wechatQR: ''
             }
         };
+        
+        // 更新缓存和时间戳
+        cachedSettings = settings;
+        lastSettingsUpdate = now;
+        
+        return settings;
     } catch (error) {
         console.error('加载网站设置失败:', error);
         // 返回默认值
@@ -1122,8 +1192,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         // 添加加载更多事件处理 - 用于懒加载图片
         window.addEventListener('scroll', handleScrollForLazyLoading);
         
-        // 开始自动更新检查
-        setInterval(updateLastEditTime, 30000); // 每30秒检查一次更新
+        // 开始自动更新检查 - 调整为60秒检查一次
+        setInterval(updateLastEditTime, 60000); // 每60秒检查一次更新
         
         // 每小时检查一次年份变更（尤其是在跨年夜）
         setInterval(updateFooterYear, 3600000); // 每小时检查一次年份
@@ -1216,21 +1286,22 @@ function closeContactPanel() {
  * 加载联系信息
  */
 function loadContactInfo() {
-    fetch('/api/settings')
-        .then(response => response.json())
-        .then(data => {
-            const contact = data.contact || {};
+    // 使用缓存中的设置或重新加载
+    (async () => {
+        try {
+            const settings = await loadSiteSettings();
+            const contact = settings.contact || {};
             
             // 更新联系信息面板
             updateContactPanel(contact);
-        })
-        .catch(error => {
+        } catch (error) {
             console.error('加载联系信息出错:', error);
             // 出错时也隐藏联系按钮
             if (DOM.contactFloatBtn) {
                 DOM.contactFloatBtn.style.display = 'none';
             }
-        });
+        }
+    })();
 }
 
 /**
