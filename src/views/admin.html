@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后台管理</title>
+    <link rel="icon" type="image/x-icon" id="favicon">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body class="min-h-screen bg-gray-50">
+    <!-- 通知消息容器 -->
+    <div id="toastContainer" class="toast-container"></div>
+    
+    <!-- 顶部导航栏 -->
+    <nav class="bg-white shadow-sm fixed top-0 left-0 right-0 z-50">
+        <div class="container mx-auto px-2 lg:px-4 xl:px-2 max-w-full xl:max-w-[98%]">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-bold text-gray-800">后台管理</h1>
+                </div>
+                <div class="flex items-center space-x-2 md:space-x-4 nav-buttons">
+                    <a href="/" class="btn btn-sm btn-secondary btn-nav">
+                        <i class="fas fa-home"></i>
+                        <span class="hidden md:inline-block">首页</span>
+                    </a>
+                    <button onclick="openChangePasswordModal()" class="btn btn-sm btn-secondary btn-nav">
+                        <i class="fas fa-key"></i>
+                        <span class="hidden md:inline-block">修改密码</span>
+                    </button>
+                    <button onclick="logout()" class="btn btn-sm btn-danger btn-nav">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span class="hidden md:inline-block">退出</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容区域 -->
+    <main class="container mx-auto px-2 lg:px-4 xl:px-2 pt-20 pb-8 max-w-full xl:max-w-[98%]">
+        <!-- 统计卡片区域 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-green-100">
+                        <i class="fas fa-chart-line text-green-500"></i>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-gray-500 text-sm">已售商品</h3>
+                        <p class="text-2xl" id="soldProducts">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-yellow-100">
+                        <i class="fas fa-eye text-yellow-500"></i>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-gray-500 text-sm">今日访问</h3>
+                        <p class="text-2xl" id="todayVisits">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-blue-100">
+                        <i class="fas fa-mobile-alt text-blue-500"></i>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-gray-500 text-sm">在售商品</h3>
+                        <p class="text-2xl" id="totalProducts">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-purple-100">
+                        <i class="fas fa-cog text-purple-500"></i>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-gray-500 text-sm">系统设置</h3>
+                        <a href="#" onclick="openSettingsModal()" class="text-sm text-blue-500">立即配置</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主要内容和侧边栏 -->
+        <div class="grid grid-cols-12 gap-4 xl:gap-6">
+            <!-- 主要内容区域 - 商品管理 -->
+            <div class="col-span-12 lg:col-span-10 xl:col-span-11 bg-white rounded-lg shadow-md">
+                <div class="p-4 xl:p-6 border-b border-gray-100">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-semibold text-gray-800">商品管理</h2>
+                        <button onclick="openAddProductModal()" class="btn btn-primary btn-add-product">
+                            <i class="fas fa-plus mr-2"></i><span class="hidden md:inline-block">添加商品</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="p-4 xl:p-6">
+                    <!-- 搜索和筛选区域 -->
+                    <div class="search-filter-container mb-4">
+                            <!-- 搜索框 -->
+                            <div class="search-container">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="searchInput" placeholder="搜索商品名称..." class="w-full">
+                            </div>
+                            <!-- 筛选区域 -->
+                            <div class="filter-container">
+                                <div class="sort-container">
+                                    <select id="sortField" class="sort-select">
+                                        <option value="price">价格排序</option>
+                                        <option value="condition">成色排序</option>
+                                        <option value="name">名称排序</option>
+                                        <option value="status">状态排序</option>
+                                    </select>
+                                </div>
+                                <div class="sort-direction">
+                                    <button id="sortDirection" class="sort-btn">
+                                        <i class="fas fa-sort-amount-down" id="sortIcon"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    <div class="overflow-x-auto mt-4">
+                        <table class="min-w-full bg-white">
+                            <thead>
+                                <tr class="phone-row">
+                                    <th class="py-2 px-4 bg-gray-50 text-gray-600 font-medium text-sm text-left">商品</th>
+                                    <th class="py-2 px-4 bg-gray-50 text-gray-600 font-medium text-sm text-center">存储</th>
+                                    <th class="py-2 px-4 bg-gray-50 text-gray-600 font-medium text-sm text-right">价格</th>
+                                    <th class="py-2 px-4 bg-gray-50 text-gray-600 font-medium text-sm text-center">成色</th>
+                                    <th class="py-2 px-4 bg-gray-50 text-gray-600 font-medium text-sm text-left">描述/维修记录</th>
+                                    <th class="py-2 px-4 bg-gray-50 text-gray-600 font-medium text-sm text-center">状态</th>
+                                    <th class="py-2 px-4 bg-gray-50 text-gray-600 font-medium text-sm text-center md:table-cell">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="productsTableBody">
+                                <tr>
+                                    <td colspan="7" class="text-center py-4">加载商品数据中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        
+                        <!-- 分页控件 -->
+                        <div class="pagination-container" id="paginationContainer">
+                            <div class="pagination-count" id="paginationCount">
+                                <!-- 页数信息将通过JS动态生成 -->
+                            </div>
+                            <div class="pagination-controls">
+                                <button class="pagination-button" id="prevPageBtn" aria-label="上一页">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <div class="pagination-numbers" id="paginationNumbers">
+                                    <!-- 页码按钮将通过JS动态生成 -->
+                                </div>
+                                <button class="pagination-button" id="nextPageBtn" aria-label="下一页">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 侧边栏 - 网站状态 -->
+            <div class="col-span-12 lg:col-span-2 xl:col-span-1 space-y-4">
+                <div class="bg-white rounded-lg shadow-sm p-4 h-auto">
+                    <h3 class="text-base font-semibold mb-3 text-center">网站状态</h3>
+                    <div class="space-y-3 py-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600 truncate">标题:</span>
+                            <span id="siteTitleDisplay" class="text-sm font-medium text-right ml-2">二手机展示</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600 truncate">用户:</span>
+                            <span id="adminUsername" class="text-sm font-medium text-right ml-2">admin</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600 truncate">Logo:</span>
+                            <span id="logoStatus" class="text-sm font-medium text-right ml-2">
+                                <span id="logoStatusText" class="text-gray-500">未设置</span>
+                            </span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600 truncate">Favicon:</span>
+                            <span id="faviconStatus" class="text-sm font-medium text-right ml-2">
+                                <span id="faviconStatusText" class="text-gray-500">已设置</span>
+                            </span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600 truncate">状态:</span>
+                            <span id="settingsStatus" class="text-sm font-medium text-yellow-500 text-right ml-2">部分配置</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 数据统计卡片 -->
+                <div class="bg-white rounded-lg shadow-sm p-4 h-auto">
+                    <h3 class="text-base font-semibold mb-3 text-center">数据统计</h3>
+                    <div class="space-y-3 py-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">总访问量:</span>
+                            <span id="totalVisits" class="text-sm font-medium">0</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">本月销量:</span>
+                            <span id="monthlySales" class="text-sm font-medium">0</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">平均价格:</span>
+                            <span id="averagePrice" class="text-sm font-medium">¥0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 联系信息卡片 -->
+                <div class="bg-white rounded-lg shadow-sm p-4 h-auto">
+                    <h3 class="text-base font-semibold mb-3 text-center">联系信息</h3>
+                    <div class="space-y-3 py-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">电话:</span>
+                            <span id="contactPhone" class="text-sm font-medium">未设置</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">QQ:</span>
+                            <span id="contactQQ" class="text-sm font-medium">未设置</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">微信二维码:</span>
+                            <span id="wechatStatus" class="text-sm font-medium">未设置</span>
+                        </div>
+                        <div class="mt-3">
+                            <button onclick="openContactModal()" class="btn btn-sm btn-outline btn-primary w-full">
+                                <i class="fas fa-edit mr-1"></i> 编辑联系方式
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 商品模态框 -->
+    <div id="productModal" class="modal">
+        <div class="modal-content max-w-3xl">
+            <div class="modal-header">
+                <h2 id="productModalTitle">添加商品</h2>
+                <button type="button" onclick="closeProductModal()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="productForm">
+                    <input type="hidden" id="productId">
+                    
+                    <!-- 商品名称单独一行 -->
+                    <div class="mb-4">
+                        <label for="name">商品名称 <span class="text-red-500">*</span></label>
+                        <input type="text" id="name" name="name" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" autocomplete="off">
+                    </div>
+                    
+                    <!-- 存储-价格-成色一行 -->
+                    <div class="product-form-grid mb-4">
+                        <div>
+                            <label for="storage">存储 <span class="text-red-500">*</span></label>
+                            <input type="text" id="storage" name="storage" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" autocomplete="off">
+                        </div>
+                        <div>
+                            <label for="price">价格 <span class="text-red-500">*</span></label>
+                            <input type="number" id="price" name="price" required min="0" step="10" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" autocomplete="off">
+                        </div>
+                        <div>
+                            <label for="condition">成色 <span class="text-red-500">*</span></label>
+                            <select id="condition" name="condition" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" autocomplete="off">
+                                <option value="">请选择</option>
+                                <option value="全新">全新</option>
+                                <option value="99新">99新</option>
+                                <option value="95新">95新</option>
+                                <option value="9成新">9成新</option>
+                                <option value="8成新">8成新</option>
+                                <option value="7成新">7成新</option>
+                                <option value="6成新">6成新</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- 商品描述一行 -->
+                    <div class="mb-4">
+                        <label for="repair">维修记录/描述</label>
+                        <textarea id="repair" name="repair" rows="2" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" autocomplete="off"></textarea>
+                    </div>
+                    
+                    <!-- 图片URL一行，包含所有图片 -->
+                    <div class="mb-4">
+                        <label for="productImages">图片URL <span class="text-red-500">*</span> <span class="text-gray-500 text-xs">(多张图片请用英文逗号分隔，第一张为主图)</span></label>
+                        <textarea id="productImages" name="productImages" rows="2" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" autocomplete="off" placeholder="例如: https://example.com/image1.jpg, https://example.com/image2.jpg"></textarea>
+                    </div>
+                    
+                    <!-- 图片预览区域 -->
+                    <div id="imagePreviewContainer" class="hidden">
+                        <h3 class="text-sm font-medium mb-2">图片预览</h3>
+                        <div id="imagePreviewsGrid" class="max-h-none">
+                            <!-- 图片预览将在这里生成 -->
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeProductModal()" class="btn btn-secondary mr-2">取消</button>
+                <button type="button" onclick="submitProductForm()" class="btn btn-primary">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置模态框 -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content max-w-md">
+            <div class="modal-header">
+                <h2>网站设置</h2>
+                <button type="button" onclick="closeSettingsModal()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="siteSettingsForm">
+                    <div class="mb-5">
+                        <label for="siteTitle" class="block text-gray-700 mb-2">网站标题</label>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="siteTitle" name="siteTitle" class="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" placeholder="输入网站标题" autocomplete="off">
+                            <button type="button" onclick="saveSiteTitle()" class="btn btn-icon btn-sm btn-primary rounded-full w-10 h-10 flex items-center justify-center">
+                                <i class="fas fa-save"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-3">
+                        <div class="bg-white p-4 rounded-lg shadow-sm">
+                            <div class="flex items-center justify-end mb-3">
+                                <button type="button" onclick="deleteLogo()" id="logoDeleteButton" style="display:none;" class="btn btn-icon btn-sm btn-danger rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-100">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <input type="file" id="siteLogo" accept="image/*" class="hidden" onchange="validateAndPreviewFile(this, 'logoPreview', 100)" autocomplete="off">
+                            <label for="siteLogo" class="block cursor-pointer">
+                                <div id="logoPreview" class="hidden mt-2 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 h-32 flex items-center justify-center transition-all duration-300 hover:border-blue-400">
+                                    <div class="w-full h-full flex items-center justify-center">
+                                        <img src="" alt="Logo预览" class="hidden max-h-24 object-contain transition-transform duration-300 hover:scale-105" id="logoPreviewImg">
+                                        <div class="text-center" id="logoEmptyText">
+                                            <i class="fas fa-cloud-upload-alt text-gray-400 text-2xl mb-2"></i>
+                                            <p class="text-gray-500 text-sm">点击修改LOGO</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="bg-white p-4 rounded-lg shadow-sm">
+                            <div class="flex items-center justify-end mb-3">
+                                <button type="button" onclick="deleteFavicon()" id="faviconDeleteButton" style="display:none;" class="btn btn-icon btn-sm btn-danger rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-100">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <input type="file" id="siteFavicon" accept="image/*" class="hidden" onchange="validateAndPreviewFile(this, 'faviconPreview', 50)" autocomplete="off">
+                            <label for="siteFavicon" class="block cursor-pointer">
+                                <div id="faviconPreview" class="hidden mt-2 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 h-32 flex items-center justify-center transition-all duration-300 hover:border-blue-400">
+                                    <div class="w-full h-full flex items-center justify-center">
+                                        <img src="" alt="Favicon预览" class="hidden max-h-24 object-contain transition-transform duration-300 hover:scale-105" id="faviconPreviewImg">
+                                        <div class="text-center" id="faviconEmptyText">
+                                            <i class="fas fa-cloud-upload-alt text-gray-400 text-2xl mb-2"></i>
+                                            <p class="text-gray-500 text-sm">点击修改Favicon</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 修改密码模态框 -->
+    <div id="changePasswordModal" class="modal">
+        <div class="modal-content max-w-md">
+            <div class="modal-header">
+                <h2>修改密码</h2>
+                <button type="button" onclick="closeChangePasswordModal()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="changePasswordForm">
+                    <div class="mb-4">
+                        <label for="currentPassword">当前密码</label>
+                        <input type="password" id="currentPassword" name="currentPassword" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" autocomplete="current-password">
+                    </div>
+                    <div class="mb-4">
+                        <label for="newPassword">新密码</label>
+                        <input type="password" id="newPassword" name="newPassword" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" autocomplete="new-password">
+                    </div>
+                    <div class="mb-4">
+                        <label for="confirmPassword">确认新密码</label>
+                        <input type="password" id="confirmPassword" name="confirmPassword" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" autocomplete="new-password">
+                    </div>
+                    <div class="mt-6">
+                        <button type="submit" class="btn btn-primary">确认修改</button>
+                        <button type="button" onclick="closeChangePasswordModal()" class="btn btn-secondary ml-2">取消</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认操作模态框 -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>确认操作</h2>
+                <button type="button" onclick="closeConfirmModal()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmModalMessage" class="text-gray-700">您确定要执行此操作吗？</p>
+                <div class="mt-6 flex justify-end">
+                    <button type="button" id="confirmModalConfirmBtn" class="btn btn-danger">确定</button>
+                    <button type="button" id="confirmModalCancelBtn" onclick="closeConfirmModal()" class="btn btn-secondary ml-2">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 联系信息编辑模态框 -->
+    <div id="contactModal" class="modal">
+        <div class="modal-content max-w-md">
+            <div class="modal-header">
+                <h2>编辑联系方式</h2>
+                <button type="button" onclick="closeContactModal()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="contactForm">
+                    <div class="mb-4">
+                        <label for="contactPhoneInput" class="block text-gray-700 mb-2">电话</label>
+                        <input type="text" id="contactPhoneInput" name="contactPhone" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" placeholder="输入联系电话" autocomplete="off">
+                    </div>
+                    <div class="mb-4">
+                        <label for="contactQQInput" class="block text-gray-700 mb-2">QQ</label>
+                        <input type="text" id="contactQQInput" name="contactQQ" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" placeholder="输入QQ号码" autocomplete="off">
+                    </div>
+                    <div class="mb-4">
+                        <label for="wechatQRCode" class="block text-gray-700 mb-2">微信二维码</label>
+                        <div class="flex items-center gap-2">
+                            <input type="file" id="wechatQRCode" accept="image/*" class="hidden" onchange="validateAndPreviewFile(this, 'wechatPreview', 200)" autocomplete="off">
+                            <div class="w-full">
+                                <label for="wechatQRCode" class="block cursor-pointer">
+                                    <div id="wechatPreview" class="border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 h-40 flex items-center justify-center transition-all duration-300 hover:border-blue-400">
+                                        <div class="w-full h-full flex items-center justify-center">
+                                            <img src="" alt="微信二维码预览" class="hidden max-h-36 max-w-full object-contain transition-transform duration-300 hover:scale-105" id="wechatPreviewImg">
+                                            <div class="text-center" id="wechatEmptyText">
+                                                <i class="fas fa-qrcode text-gray-400 text-3xl mb-2"></i>
+                                                <p class="text-gray-500 text-sm">点击上传微信二维码</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                            <button type="button" onclick="deleteWechatQRCode()" id="wechatDeleteButton" style="display:none;" class="btn btn-icon btn-sm btn-danger rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-100">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-6 flex justify-end">
+                        <button type="button" onclick="saveContactInfo()" class="btn btn-primary">保存</button>
+                        <button type="button" onclick="closeContactModal()" class="btn btn-secondary ml-2">取消</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加商品模态框 -->
+    <div id="addProductModal" class="modal">
+        <div class="modal-content max-w-lg">
+            <div class="modal-header">
+                <h2 id="addProductModalTitle">添加商品</h2>
+                <button type="button" onclick="closeProductModal()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="addProductForm">
+                    <input type="hidden" id="addProductId">
+                    <div class="mb-4">
+                        <label for="productName">商品名称</label>
+                        <input type="text" id="productName" name="productName" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label for="productPrice">价格 (元)</label>
+                            <input type="number" id="productPrice" name="productPrice" required min="0" step="10" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="productStatus">状态</label>
+                            <select id="productStatus" name="productStatus" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                                <option value="available">上架</option>
+                                <option value="sold">已售</option>
+                                <option value="reserved">预定中</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label for="addProductImages">图片URL (多张图片请用英文逗号分隔)</label>
+                        <textarea id="addProductImages" name="productImages" required rows="3" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label for="productDescription">商品描述</label>
+                        <textarea id="productDescription" name="productDescription" required rows="4" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"></textarea>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label for="productBrand">品牌</label>
+                            <input type="text" id="productBrand" name="productBrand" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="productModel">型号</label>
+                            <input type="text" id="productModel" name="productModel" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+                    <div class="mt-6 flex justify-end">
+                        <button type="submit" class="btn btn-primary">保存</button>
+                        <button type="button" onclick="closeProductModal()" class="btn btn-secondary ml-2">取消</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/admin.js"></script>
+</body>
+</html>

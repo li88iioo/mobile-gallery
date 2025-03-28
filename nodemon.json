@@ -1,0 +1,20 @@
+{
+  "watch": [
+    "src/**/*",
+    "*.*"
+  ],
+  "ignore": [
+    "node_modules/**/*",
+    "dist/**/*",
+    "uploads/**/*",
+    "data/**/*",
+    ".git",
+    "*.test.js"
+  ],
+  "ext": "js,json,html,css",
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "delay": "500",
+  "verbose": true
+}

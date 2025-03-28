@@ -1,0 +1,42 @@
+{
+  "name": "mobile-gallery",
+  "version": "1.0.0",
+  "description": "Web application with frontend and backend",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "build": "npm run build:css && npm run minify:js && npm run minify:admin && npm run minify:login && npm run minify:index-css && npm run minify:admin-css && npm run minify:login-css && npm run minify:server",
+    "build:css": "tailwindcss -i ./src/public/css/input.css -o ./src/public/css/tailwind.css --minify",
+    "watch:css": "tailwindcss -i ./src/public/css/input.css -o ./src/public/css/tailwind.css --watch",
+    "minify:js": "terser src/public/js/index.js -o src/public/js/index.min.js --compress --mangle",
+    "minify:admin": "terser src/public/js/admin.js -o src/public/js/admin.min.js --compress --mangle",
+    "minify:login": "terser src/public/js/login.js -o src/public/js/login.min.js --compress --mangle",
+    "minify:index-css": "postcss src/public/css/index.css --config scripts/postcss.config.js --no-map --use cssnano -o src/public/css/index.min.css",
+    "minify:admin-css": "postcss src/public/css/admin.css --config scripts/postcss.config.js --no-map --use cssnano -o src/public/css/admin.min.css",
+    "minify:login-css": "postcss src/public/css/login.css --config scripts/postcss.config.js --no-map --use cssnano -o src/public/css/login.min.css",
+    "build:production": "node scripts/build-production.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.0",
+    "body-parser": "^1.20.2",
+    "connect-mongo": "^5.0.0",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "glob": "^10.3.10",
+    "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.17",
+    "cssnano": "^7.0.6",
+    "minimatch": "^10.0.1",
+    "nodemon": "^3.0.2",
+    "postcss": "^8.5.3",
+    "postcss-cli": "^11.0.1",
+    "tailwindcss": "^3.4.1",
+    "terser": "^5.39.0"
+  }
+}

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>二手机展示</title>
+    <meta name="description" content="优质二手手机展示平台，提供各类二手手机信息">
+    <link rel="icon" type="image/x-icon" id="favicon">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/tailwind.css">
+    <link rel="stylesheet" href="/css/index.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- 通知消息容器 -->
+    <div id="toastContainer" class="toast-container"></div>
+    
+    <!-- 头部导航栏 -->
+    <header class="site-header">
+        <div class="site-header-container">
+            <div class="site-brand">
+                <img id="siteLogo" class="site-logo hidden" alt="网站Logo">
+                <h1 class="site-title" id="titleClick">二手机展示</h1>
+            </div>
+            <div class="header-actions">
+                <!-- 占位，未来可添加更多功能按钮 -->
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要内容区域 -->
+    <main class="main-container">
+        <div class="control-bar">
+            <div class="sort-controls">
+                <span class="sort-label unselectable">排序:</span>
+                <button class="sort-btn" data-sort="price" onclick="handleSort('price')">
+                    <span class="unselectable">价格</span> <i class="fas fa-chevron-up sort-icon"></i>
+                </button>
+                <button class="sort-btn" data-sort="name" onclick="handleSort('name')">
+                    <span class="unselectable">名称</span> <i class="fas fa-chevron-up sort-icon"></i>
+                </button>
+                <button class="sort-btn" data-sort="condition" onclick="handleSort('condition')">
+                    <span class="unselectable">成色</span> <i class="fas fa-chevron-up sort-icon"></i>
+                </button>
+            </div>
+            <div class="search-bar unselectable">
+                <i class="fas fa-search search-icon unselectable"></i>
+                <input type="text" id="searchInput" class="search-input" placeholder="搜索手机名称..." oninput="handleSearch(this.value)">
+            </div>
+        </div>
+
+        <!-- 商品栅格 -->
+        <div class="products-grid unselectable" id="phone-container">
+            <div class="product-card-skeleton"></div>
+            <div class="product-card-skeleton"></div>
+            <div class="product-card-skeleton"></div>
+            <div class="product-card-skeleton"></div>
+            <div class="product-card-skeleton"></div>
+            <div class="product-card-skeleton"></div>
+        </div>
+        
+        <!-- 无结果提示 -->
+        <div id="noResultsMessage" class="hidden text-center py-10">
+            <div class="text-gray-400 mb-4">
+                <i class="fas fa-search fa-3x"></i>
+            </div>
+            <h3 class="text-xl font-semibold text-gray-600 mb-2">没有找到相关结果</h3>
+            <p class="text-gray-500">尝试使用其他关键词搜索，或清除筛选条件</p>
+        </div>
+        
+        <div id="pagination-container" class="pagination unselectable">
+        </div>
+
+        <!-- 最后更新时间 -->
+        <div class="text-center text-sm text-gray-500 mt-6 unselectable">
+            最后更新时间: <span id="lastEditTime">--</span>
+        </div>
+    </main>
+
+    <!-- 详情模态框 -->
+    <div id="phoneModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">产品详情</h2>
+                <button class="modal-close" onclick="closeModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="product-details" id="modalContent">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 全屏图片查看器 -->
+    <div id="lightbox" class="lightbox">
+        <button class="lightbox-close" onclick="closeLightbox()">
+            <i class="fas fa-times"></i>
+        </button>
+        <button class="lightbox-nav lightbox-prev" id="lightboxPrev">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <div class="lightbox-img-container" id="lightboxContainer">
+            <img src="" alt="" class="lightbox-img" id="lightboxImg">
+        </div>
+        <button class="lightbox-nav lightbox-next" id="lightboxNext">
+            <i class="fas fa-chevron-right"></i>
+        </button>
+        <div class="lightbox-counter" id="lightboxCounter">1/1</div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white bg-opacity-80 backdrop-blur-sm p-6 mt-8 border-t border-gray-200">
+        <div class="main-container text-center">
+            <p class="text-gray-600 text-sm flex items-center justify-center gap-3 flex-wrap unselectable">
+                <span>&copy; <span id="currentYear">2023</span> 二手机展示</span>
+                <span class="text-gray-300">|</span>
+                <a href="https://github.com/li88iioo/mobile-gallery" target="_blank" 
+                   class="inline-flex items-center text-primary-600 hover:text-primary-700 transition-colors duration-200">
+                    <i class="fab fa-github mr-1"></i> GitHub
+                </a>
+                <span class="text-gray-300">|</span>
+                <span class="text-gray-500">本站累计访问: <span id="totalVisits">--</span> 次</span>
+            </p>
+        </div>
+    </footer>
+
+    <!-- 联系悬浮按钮 -->
+    <div id="contactFloatBtn" class="fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all transform" title="联系我们" style="display: none;">
+        <i class="fas fa-headset text-xl"></i>
+    </div>
+
+    <!-- 联系信息弹出层 -->
+    <div id="contactPanel" class="fixed bottom-20 right-6 z-50 bg-white rounded-lg shadow-xl p-5 w-72 transform scale-0 opacity-0 origin-bottom-right transition-all duration-300">
+        <div class="flex justify-between items-center mb-3">
+            <h3 class="text-lg font-medium text-gray-800">联系我们</h3>
+            <button id="closeContactPanel" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="space-y-4">
+            <div id="contactPhoneContainer" class="hidden">
+                <div class="flex items-center gap-3">
+                    <div class="bg-blue-100 p-2 rounded-full">
+                        <i class="fas fa-phone text-blue-600"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">电话</p>
+                        <p id="contactPhoneDisplay" class="font-medium"></p>
+                    </div>
+                </div>
+            </div>
+            <div id="contactQQContainer" class="hidden">
+                <div class="flex items-center gap-3">
+                    <div class="bg-blue-100 p-2 rounded-full">
+                        <i class="fab fa-qq text-blue-600"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">QQ</p>
+                        <p id="contactQQDisplay" class="font-medium"></p>
+                    </div>
+                </div>
+            </div>
+            <div id="wechatQRContainer" class="hidden">
+                <div class="flex flex-col items-center gap-2">
+                    <p class="text-sm text-gray-500">微信扫码</p>
+                    <img id="wechatQRDisplay" src="" alt="微信二维码" class="w-48 h-48 object-contain border p-1 rounded no-copy-image" oncontextmenu="return false;" draggable="false">
+                </div>
+            </div>
+            <div id="noContactInfo" class="py-8 text-center text-gray-500">
+                <i class="fas fa-info-circle text-2xl mb-2"></i>
+                <p>暂无联系方式</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/index.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    restart: always
+    container_name: mobile-gallery-app
+    ports:
+      - "3888:3888"
+    volumes:
+      - ./src/data:/app/src/data
+      - ./src/uploads:/app/src/uploads
+    env_file:
+      - .env 
