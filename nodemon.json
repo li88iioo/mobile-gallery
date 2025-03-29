@@ -1,15 +1,15 @@
 {
   "watch": [
     "src/**/*",
-    "*.*"
+    "*.js",
+    "*.json"
   ],
   "ignore": [
     "node_modules/**/*",
-    "dist/**/*",
-    "uploads/**/*",
-    "data/**/*",
-    ".git",
-    "*.test.js"
+    "src/uploads/**/*",
+    "src/data/**/*",
+    ".git/**/*",
+    "**/*.test.js"
   ],
   "ext": "js,json,html,css",
   "env": {
